@@ -40,6 +40,8 @@ public:
     // get and put
     Bytes get(const std::string &path, size_t block_num);
     void put(const std::string &path, size_t block_num, const Bytes &bytes);
+    auto pop(const std::string &path, size_t block_num);
+    void pop_file(const std::string &path);
     // block io
     Bytes read_block(const std::string &path, size_t block_num);
     void write_block(const std::string &path, size_t block_num, const Bytes &bytes);
@@ -53,7 +55,7 @@ private:
     Cache(Cache &&)= delete;
     Cache &operator=(const Cache &)= delete;
     Cache &operator=(Cache &&)= delete;
-    ~Cache(){
+    ~Cache()noexcept{
         sync();
     }
 

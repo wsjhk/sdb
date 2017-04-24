@@ -2,6 +2,7 @@
 #include <iostream>
 #include <initializer_list>
 #include "util.h"
+#include "type.h"
 
 namespace SDB {
     namespace Type {
@@ -108,24 +109,6 @@ namespace SDB {
         bool is_var_type(Enum::ColType type) {
             using namespace Enum;
             return type == VARCHAR;
-        }
-
-        Type::BVFunc get_bvfunc(Enum::BVFunc func, Type::Value value) {
-            using Type::Value;
-            switch (func) {
-                case Enum::EQ:
-                    return [value](Value v){ return v == value;};
-                case Enum::LESS:
-                    return [value](Value v){ return v < value;};
-                case Enum::GREATER:
-                    return [value](Value v){ return !(v <= value);};
-            }
-        }
-        void tuple_lst_map(Type::TupleLst &tuple_lst,
-                           const std::string &col_name,
-                           Type::VVFunc) {
-            for (auto &&tuple : tuple_lst.tuple_lst) {
-            }
         }
     }
 }

@@ -230,6 +230,9 @@ void Record::create(const TableProperty &property) {
 }
 
 void Record::drop(const TableProperty &property) {
+    Cache &cache = Cache::make();
+    cache.pop_file(get_record_meta_path(property));
+    cache.pop_file(get_record_path(property));
     IO::delete_file(get_record_path(property));
     IO::delete_file(get_record_meta_path(property));
 }

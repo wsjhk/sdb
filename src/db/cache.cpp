@@ -68,6 +68,35 @@ void Cache::put(const std::string &path, size_t block_num, const Bytes &bytes) {
     data[key] = CacheValue(ptr, count_lst.begin(), count_lst.begin()->second.begin());
 }
 
+// pop a cache value
+auto Cache::pop(const std::string &path, size_t block_num){
+    auto key = encode_key(path, block_num);
+    auto data_it = data.find(key);
+    if (data_it == data.end()){
+        return data.end();
+    }
+    auto count_lst_it = data_it->second.count_iter;
+    count_lst_it->second.erase(data_it->second.key_iter);
+    if (count_lst_it->second.empty()){
+        count_lst.erase(count_lst_it);
+    }
+    return data.erase(data_it);
+}
+
+// pop a file cache
+void Cache::pop_file(const std::string &path){
+    for (auto it = data.begin(); it != data.end();it++) {
+        auto pair = decode_key(it->first);
+        if (pair.first == path) {
+            it = pop(pair.first, pair.second);
+            if (it == data.end()){
+                break;
+            }
+            continue;
+        }
+    }
+}
+
 Cache::Bytes Cache::read_block(const std::string &path, size_t block_num) {
     // read cache
     Bytes cache_bytes = get(path, block_num);

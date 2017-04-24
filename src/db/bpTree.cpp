@@ -239,6 +239,9 @@ void BpTree::create(const TableProperty &property) {
 }
 
 void BpTree::drop(const TableProperty &property) {
+    Cache &cache = Cache::make();
+    cache.pop_file(get_index_path(property));
+    cache.pop_file(get_index_meta_path(property));
     IO::delete_file(get_index_path(property));
     IO::delete_file(get_index_meta_path(property));
 }

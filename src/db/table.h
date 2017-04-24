@@ -6,6 +6,7 @@
 
 #include "record.h"
 #include "util.h"
+#include "type.h"
 
 class Table {
 public:

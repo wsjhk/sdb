@@ -18,6 +18,8 @@ void DB::create_db(const std::string &db_name) {
 }
 
 void DB::drop_db(){
+    Cache &cache = Cache::make();
+    cache.pop_file(get_meta_path(db_name));
     IO::delete_file(get_meta_path(db_name));
     for (auto &&table_name : table_name_set) {
         Table table(db_name, table_name);

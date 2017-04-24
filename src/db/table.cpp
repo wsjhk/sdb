@@ -121,6 +121,8 @@ void Table::create_table(const SDB::Type::TableProperty &property) {
 }
 
 void Table::drop_table() {
+    Cache &cache = Cache::make();
+    cache.pop_file(get_table_meta_path(property));
     IO::delete_file(get_table_meta_path(property));
     // index
     BpTree::drop(property);

@@ -6,6 +6,7 @@
 #include <functional>
 
 #include "util.h"
+#include "type.h"
 
 class Record {
 public:

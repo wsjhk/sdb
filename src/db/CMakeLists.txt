@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(main)
 
-add_compile_options(-std=c++14)
+add_compile_options(-std=c++1z)
 
 file(GLOB SOURCE_FILES "*.cpp")
 add_executable(main ${SOURCE_FILES})

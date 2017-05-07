@@ -22,19 +22,19 @@ Record::TupleLst Record::read_record(const SDB::Type::PosList &pos_lst) {
         size_t offset = item % BLOCK_SIZE;
         block_offsets_map[block_num].push_back(offset);
     }
-    TupleLst tuple_lst(property.tuple_property);
+    TupleLst tuple_lst(property.get_col_name_lst());
     for (auto &&item: block_offsets_map) {
         SDB::Type::Bytes data_block = Cache::make().read_block(get_record_path(property), item.first);
         for (auto offset : item.second) {
-            Tuple tuple = bytes_to_tuple(property, data_block.data(), offset);
-            tuple_lst.tuple_lst.push_back(tuple);
+            Type::TupleData data = Type::TupleData::de_bytes(property.get_tsp_lst(), data_block, offset);
+            tuple_lst.data.push_back(data);
         }
     }
     return tuple_lst;
 }
 
 Record::TupleLst Record::read_record(size_t block_num) {
-    TupleLst tuple_lst(property.tuple_property);
+    TupleLst tuple_lst(property.get_col_name_lst());
     if (block_num > end_block_num) {
         if (block_num-end_block_num==1 && free_pos_lst.empty()) {
             return tuple_lst;
@@ -49,8 +49,8 @@ Record::TupleLst Record::read_record(size_t block_num) {
         }
         auto iter = free_pos_lst.find(block_num*BLOCK_SIZE+offset);
         if (iter == free_pos_lst.end()) {
-            Tuple tuple = bytes_to_tuple(property, bytes.data(), offset);
-            tuple_lst.tuple_lst.push_back(tuple);
+            Type::TupleData data = Type::TupleData::de_bytes(property.get_tsp_lst(), bytes, offset);
+            tuple_lst.data.push_back(data);
         } else {
             offset += iter->second;
         }
@@ -64,7 +64,7 @@ void Record::write_record(size_t block_num, const TupleLst &tuple_lst) {
     }
     size_t offset = 0;
     Bytes block_data(BLOCK_SIZE);
-    for (auto &&tuple : tuple_lst.tuple_lst) {
+    for (auto &&tuple_data : tuple_lst.data) {
         if (offset > BLOCK_SIZE) {
             throw std::runtime_error("Error: [write_record] offset error");
         }
@@ -72,7 +72,7 @@ void Record::write_record(size_t block_num, const TupleLst &tuple_lst) {
         if (iter != free_pos_lst.end()) {
             offset += iter->second;
         } else {
-            Bytes bytes = tuple_to_bytes(tuple);
+            Bytes bytes = tuple_data.en_bytes();
             std::memcpy(block_data.data()+offset, bytes.data(), bytes.size());
             offset += bytes.size();
         }
@@ -92,8 +92,10 @@ void Record::update(const std::string &pred_col_name, SDB::Type::BVFunc bvFunc,
     size_t block_num = 0;
     while (block_num > end_block_num) {
         TupleLst tuple_lst = read_record(block_num);
-        for (auto &&tuple : tuple_lst.tuple_lst) {
-            tuple.set_col_value(property.tuple_property, pred_col_name, bvFunc, op_col_name, vvFunc);
+        for (auto &&tuple_data : tuple_lst.data) {
+            size_t pred_pos = Type::TupleData::get_col_name_pos(property.get_col_name_lst(), pred_col_name);
+            size_t op_pos = Type::TupleData::get_col_name_pos(property.get_col_name_lst(), op_col_name);
+            tuple_data.set_value(pred_pos, op_pos, bvFunc, vvFunc);
         }
         write_record(block_num, tuple_lst);
         block_num++;
@@ -127,18 +129,18 @@ void Record::remove_record(SDB::Type::Pos pos) {
     Bytes bytes = Cache::make().read_block(get_record_path(property), block_num);
     size_t start = pos % BLOCK_SIZE;
     size_t offset = pos % BLOCK_SIZE;
-    bytes_to_tuple(property, bytes.data(), offset);
+    Type::TupleData::de_bytes(property.get_tsp_lst(), bytes, offset);
     free_pos_lst[pos] = offset - start;
 }
 
 Record::TupleLst Record::find(const std::string &col_name, std::function<bool(Value)> predicate) {
-    TupleLst tuple_lst(property.tuple_property);
+    TupleLst tuple_lst(property.get_col_name_lst());
     for (size_t i = 0; i <= end_block_num; ++i) {
         TupleLst block_tuple_lst = read_record(i);
-        for (auto &&tuple: block_tuple_lst.tuple_lst) {
-            Value value = tuple.get_col_value(property.tuple_property, col_name);
+        for (auto &&tuple_data: block_tuple_lst.data) {
+            Value value = tuple_data.get_value(Type::TupleData::get_col_name_pos(property.get_col_name_lst(), col_name));
             if (predicate(value)) {
-                tuple_lst.tuple_lst.push_back(tuple);
+                tuple_lst.data.push_back(tuple_data);
             }
         }
     }
@@ -165,53 +167,6 @@ Pos Record::get_free_pos(size_t data_size) {
     free_pos_lst[end_block_num*BLOCK_SIZE+data_size] = BLOCK_SIZE-data_size;
     return end_block_num*BLOCK_SIZE;
 }
-
-// tuple
-SDB::Type::Bytes Record::tuple_to_bytes(const Tuple &tuple) {
-    Bytes bytes;
-    for (auto &&value : tuple.value_lst) {
-        Bytes value_bytes = value_to_bytes(value);
-        bytes.insert(bytes.end(), value_bytes.begin(), value_bytes.end());
-    }
-    return bytes;
-}
-
-Record::Tuple Record::bytes_to_tuple(const TableProperty &property,
-                                     const Byte *base,
-                                     size_t &offset) {
-    Tuple tuple;
-    for (auto &&item : property.tuple_property.property_lst) {
-        Value value = bytes_to_value(item.col_type, base, offset);
-        tuple.value_lst.push_back(value);
-    }
-    return tuple;
-}
-
-Record::Value Record::bytes_to_value(SDB::Enum::ColType type,
-                                     const Byte *base,
-                                     size_t &offset) {
-    Bytes bytes;
-    size_t len;
-    if (Value::is_var_type(type)) {
-        std::memcpy(&len, base+offset, SDB::Const::SIZE_SIZE);
-        offset += SDB::Const::SIZE_SIZE;
-    } else {
-        len = SDB::Function::get_type_len(type);
-    }
-    bytes.insert(bytes.end(), base+offset, base+offset+len);
-    offset += len;
-    return Value::make(type, bytes);
-}
-
-Bytes Record::value_to_bytes(const Value &value) {
-    Bytes bytes;
-    if (value.is_var_type()) {
-        Function::bytes_append(bytes, value.data.size());
-    }
-    bytes.insert(bytes.end(), value.data.begin(), value.data.end());
-    return bytes;
-}
-
 void Record::create(const TableProperty &property) {
     // meta_record
     Bytes record_bytes;

@@ -60,7 +60,7 @@ void BpTree::write_info_block() {
 void BpTree::initialize() {
     // set node_key_count
     size_t size_len = sizeof(size_t);
-    size_t key_size = table_property.tuple_property.get_type_size(table_property.key);
+    size_t key_size = table_property.get_type_size(table_property.key);
     size_t Pos_len = sizeof(size_t);
     node_key_count = (SDB::Const::BLOCK_SIZE-Pos_len-1-size_len)/(key_size+Pos_len);
     // read info block
@@ -133,7 +133,7 @@ void BpTree::update(const Value &key, const Bytes &data) {
                 x.second = record.update(x.second, data);
                 write(ptr);
                 return;
-            } else if (!is_leaf && key <= x.first){
+            } else if (!is_leaf && (key < x.first || key == x.first)){
                 ptr = read(x.second);
                 is_for_end = false;
                 break;
@@ -160,26 +160,20 @@ BpTree::nodePtrType BpTree::read(SDB::Type::Pos pos) const{
     ptr->is_leaf = block_data[0];
 
     // get pos list
-    size_t key_len = table_property.tuple_property.get_type_size(table_property.key);
-    size_t item_len = key_len + sizeof(pos);
+    size_t offset = 0;
     size_t pos_lst_len;
-    std::memcpy(&pos_lst_len, block_data.data()+1, sizeof(size_t));
-    auto beg = block_data.data()+1+sizeof(size_t);
+    Function::de_bytes(pos_lst_len, block_data, offset);
     for (size_t i = 0; i < pos_lst_len; ++i) {
-        Bytes item_bytes(beg+(i*item_len), beg+((i+1)*item_len));
-        auto item_beg = beg+(i*item_len);
-        auto item_tem = item_beg+key_len;
-        auto item_end = item_tem + sizeof(pos);
-        auto type = table_property.tuple_property.get_col_type(table_property.key);
-        Bytes key_data(item_beg, item_beg+key_len);
-        Value key(type, key_data);
+        Enum::ColType type;
+        Function::de_bytes(type, block_data, offset);
+        Value key = Value::make(type, table_property.get_type_size(table_property.key));
+        Value::de_bytes(key, block_data, offset);
         Pos child_pos;
-        std::memcpy(&child_pos, item_tem, sizeof(pos));
-        auto item = std::make_pair(key, child_pos);
-        ptr->pos_lst.push_back(item);
+        Function::de_bytes(child_pos, block_data, offset);
+        ptr->pos_lst.push_back(std::make_pair(key, child_pos));
     }
     if (ptr->is_leaf) {
-        std::memcpy(&ptr->end_pos, beg+(pos_lst_len*item_len), sizeof(ptr->end_pos));
+        Function::de_bytes(ptr->end_pos, block_data, offset);
     }
     ptr->file_pos = pos;
     ptr->is_new_node = false;
@@ -187,26 +181,17 @@ BpTree::nodePtrType BpTree::read(SDB::Type::Pos pos) const{
 }
 
 void BpTree::write(nodePtrType ptr) {
-    using SDB::Function::en_bytes;
-    Bytes block_data(SDB::Const::BLOCK_SIZE);
-    size_t key_len = table_property.tuple_property.get_type_size(table_property.key);
-    size_t item_len = key_len + sizeof(size_t);
-    size_t size_len = sizeof(size_t);
-    size_t char_len = sizeof(char);
+    Bytes block_data;
     char is_leaf = ptr->is_leaf;
-    std::memcpy(block_data.data(), &is_leaf, char_len);
-    size_t pos_lst_len = ptr->pos_lst.size();
-    std::memcpy(block_data.data()+char_len, &pos_lst_len, size_len);
-    auto beg = block_data.data()+sizeof(char)+size_len;
-    size_t offset = 0;
-    for (auto &&item : ptr->pos_lst) {
-        Bytes key_bytes = item.first.data;
-        std::memcpy(beg+offset, key_bytes.data(), key_len);
-        std::memcpy(beg+offset+key_len, &item.second, sizeof(size_t));
-        offset += item_len;
+    Function::bytes_append(block_data, is_leaf);
+    Function::bytes_append(block_data, ptr->pos_lst.size());
+    for (auto &&[key, pos]: ptr->pos_lst) {
+        Bytes key_bytes = key.en_bytes();
+        block_data.insert(block_data.end(), key_bytes.begin(), key_bytes.end());
+        Function::bytes_append(block_data, pos);
     }
     if (is_leaf) {
-        std::memcpy(beg+offset, &ptr->end_pos, key_len);
+        Function::bytes_append(block_data, ptr->end_pos);
     }
     Pos write_pos;
     if (!ptr->is_new_node) {
@@ -337,7 +322,7 @@ BpTree::PosList BpTree::find(const Value &key) const{
                 PosList pos_lst;
                 pos_lst.push_back(x.second);
                 return pos_lst;
-            } else if (!is_leaf && key <= x.first){
+            } else if (!is_leaf && (key < x.first || key == x.first)){
                 ptr = read(x.second);
                 is_for_end = false;
                 break;
@@ -349,6 +334,7 @@ BpTree::PosList BpTree::find(const Value &key) const{
             return PosList();
         }
     }
+    return PosList();
 }
 
 PosList BpTree::find(const Value &beg, const Value &end) const {
@@ -449,7 +435,7 @@ bool BpTree::remove_r(const Value &key, nodePtrType &ptr) {
             } else if (key < iter->first) {
                 throw_error("Error: can't find Key");
             }
-        } else if (key <= iter->first) {
+        } else if (key < iter->first || key == iter->first) {
             nodePtrType iter_sec_ptr = read(iter->second);
             bool is_less = remove_r(key, iter_sec_ptr);
             iter->first = iter_sec_ptr->last_key();
@@ -493,7 +479,7 @@ BpTree::nodePtrType BpTree::find_near_key_node(const Value &key)const {
         for (auto &&x: ptr->pos_lst) {
             if (is_leaf){
                 return ptr;
-            } else if (key <= x.first) {
+            } else if (key < x.first || key == x.first) {
                 ptr = read(x.second);
                 is_for_end = false;
                 break;
@@ -506,6 +492,7 @@ BpTree::nodePtrType BpTree::find_near_key_node(const Value &key)const {
             ptr = read(std::prev(ptr->pos_lst.end())->second);
         }
     }
+    throw std::runtime_error("Error: find_near_key_node!");
 }
 
 BpTree::nodePosLstType::const_iterator

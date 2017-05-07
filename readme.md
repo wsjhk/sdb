@@ -3,6 +3,11 @@ sdb
 
 sdb是一个简单的RDBMS。
 
+依赖
+--------
++ boost库 
++ support a few C++17 feature compiler
+
 代码结构:
 ---------
 
@@ -102,6 +107,8 @@ todo:
 - [  ] Test
 
 - [  ] Transaction support
+
+- [  ] type system
 
 ### TODO SQL Layer
 

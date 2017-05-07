@@ -31,7 +31,7 @@ public:
     // sql
     static void create_table(const SDB::Type::TableProperty &property);
     void drop_table();
-    void insert(const Tuple &tuple);
+    void insert(const SDB::Type::TupleData &tuple_data);
     void remove(const std::string &col_name, const Value &value);
     void remove(const std::string &col_name, SDB::Type::BVFunc predicate);
     void update(const std::string &pred_col_name, SDB::Type::BVFunc predicate,
@@ -51,7 +51,7 @@ public:
     std::unordered_map<std::string, std::string> get_referenced_map()const;
     std::unordered_map<std::string, std::string> get_referencing_map()const;
     std::string get_key()const;
-    SDB::Type::TupleProperty get_tuple_property()const;
+    std::vector<std::string> get_col_name_lst()const{return property.get_col_name_lst();}
 
 private:
     //function

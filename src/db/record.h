@@ -43,13 +43,6 @@ public:
     // get
     Pos get_free_pos(size_t data_size);
 
-    // value_lst
-    // convert
-    static SDB::Type::Bytes tuple_to_bytes(const Tuple &tuple);
-    static Tuple bytes_to_tuple(const TableProperty &property, const Byte *base, size_t &offset);
-    static Value bytes_to_value(SDB::Enum::ColType type, const Byte *base, size_t &offset);
-    static Bytes value_to_bytes(const Value &value);
-
     // create and drop
     static void create(const TableProperty &property);
     static void drop(const TableProperty &property);

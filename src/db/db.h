@@ -29,7 +29,7 @@ public:
 
     void create_table(const SDB::Type::TableProperty &table_property);
     void drop_table(const std::string &table_name);
-    void insert(const std::string &table_name, const Tuple &tuple);
+    void insert(const std::string &table_name, const SDB::Type::TupleData &tuple_data);
     void remove(const std::string &table_name, const std::string &col_name, const Value &value);
     void remove(const std::string &table_name, const std::string &col_name, SDB::Type::BVFunc predicate);
     void update(const std::string &table_name, 
@@ -51,7 +51,7 @@ private:
     // check integrity
     template <typename T>
     void check_referenced(const Table &table, T t);
-    void check_referencing(const Table &table, const Tuple &tuple);
+    void check_referencing(const Table &table, const SDB::Type::TupleData &tuple_data);
 
 
 private:

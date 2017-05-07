@@ -47,10 +47,10 @@ void DB::drop_table(const std::string &table_name) {
     is_db_drop = true;
 }
 
-void DB::insert(const std::string &table_name, const Tuple &tuple) {
+void DB::insert(const std::string &table_name, const Type::TupleData& tuple_data) {
     Table table(db_name, table_name);
-    check_referencing(table, tuple);
-    table.insert(tuple);
+    check_referencing(table, tuple_data);
+    table.insert(tuple_data);
 }
 
 void DB::remove(const std::string &table_name,
@@ -75,12 +75,13 @@ void DB::update(const std::string &table_name,
     Table table(db_name, table_name);
     TupleLst tuple_lst = table.find(pred_col_name, predicate);
     bool is_op_key = op_col_name == table.get_key();
-    for (auto &&tuple : tuple_lst.tuple_lst) {
+    for (auto &&tuple_data : tuple_lst.data) {
         if (is_op_key) {
-            Value check_value = tuple.get_col_value(table.get_tuple_property(), op_col_name);
+            Type::Pos col_pos = Type::TupleData::get_col_name_pos(table.get_col_name_lst(), op_col_name);
+            Value check_value = tuple_data.get_value(col_pos);
             check_referenced(table, check_value);
         }
-        check_referencing(table, tuple);
+        check_referencing(table, tuple_data);
     }
     table.update(pred_col_name, predicate, op_col_name, op);
 }
@@ -123,7 +124,7 @@ void DB::check_referenced(const Table &table, T t){
     for (auto &&item : referenced_map) {
         Table ref_table(db_name, item.first);
         Type::TupleLst tuple_lst = ref_table.find(item.second, t);
-        if (!tuple_lst.tuple_lst.empty()) {
+        if (!tuple_lst.data.empty()) {
             throw std::runtime_error(
                 std::string("Error : referenced key")
             );
@@ -131,13 +132,13 @@ void DB::check_referenced(const Table &table, T t){
     }
 }
 
-void DB::check_referencing(const Table &table, const Type::Tuple &tuple){
+void DB::check_referencing(const Table &table, const Type::TupleData &tuple_data){
     auto referencing_map = table.get_referencing_map();
-    for (auto &&item : referencing_map) {
-        Table ref_table(db_name, item.first);
-        Type::Value check_value = tuple.get_col_value(table.get_tuple_property(), item.second);
+    for (auto &&[refing_name, refed_name] : referencing_map) {
+        Table ref_table(db_name, refing_name);
+        Type::Value check_value = tuple_data.get_value(tuple_data.get_col_name_pos(table.get_col_name_lst(), refed_name));
         Type::TupleLst tuple_lst = ref_table.find(ref_table.get_key(), check_value);
-        if (tuple_lst.tuple_lst.empty()) {
+        if (tuple_lst.data.empty()) {
             throw std::runtime_error(
                 std::string("Error [db.insert]: can't fonud referencing key:")+check_value.get_string()
             );

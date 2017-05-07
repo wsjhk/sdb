@@ -20,29 +20,28 @@ using SDB::Type::Pos;
 using SDB::Type::PosList;
 using SDB::Type::Bytes;
 using SDB::Type::Value;
-using SDB::Type::TupleProperty;
 using SDB::Enum::ColType;
 
 using namespace SDB;
 
 // SQL
-void Table::insert(const Tuple &tuple) {
-    auto bytes = Record::tuple_to_bytes(tuple);
+void Table::insert(const Type::TupleData &tuple_data) {
+    auto bytes = tuple_data.en_bytes();
     BpTree bpTree(property);
-    bpTree.insert(tuple.get_col_value(property.tuple_property, property.key), bytes);
+    bpTree.insert(tuple_data.get_value(property.get_col_name_lst(), property.key), bytes);
 }
 
 void Table::update(const std::string &pred_col_name, SDB::Type::BVFunc predicate,
                    const std::string &op_col_name, SDB::Type::VVFunc op) {
     Record record(property);
     BpTree bpTree(property);
-    bool is_var_type = SDB::Function::is_var_type(property.tuple_property.get_col_type(op_col_name));
+    bool is_var_type = SDB::Function::is_var_type(property.get_col_type(op_col_name));
     if (!is_has_index(pred_col_name) && !is_var_type) {
         record.update(pred_col_name, predicate, op_col_name, op);
         return;
     }
     // get tuple lst
-    TupleLst tuple_lst(property.tuple_property);
+    TupleLst tuple_lst(property.get_col_name_lst());
     if (is_has_index(pred_col_name)) {
         PosList pos_lst = bpTree.find(predicate);
         tuple_lst = record.read_record(pos_lst);
@@ -50,11 +49,12 @@ void Table::update(const std::string &pred_col_name, SDB::Type::BVFunc predicate
         tuple_lst = record.find(pred_col_name, predicate);
     }
     // data update
-    for (auto &&tuple : tuple_lst.tuple_lst) {
-        Value key = tuple.get_col_value(property.tuple_property, property.key);
-//        Value value = op(tuple.get_col_value(property.tuple_property, pred_col_name));
-        tuple.set_col_value(tuple_lst.tuple_property, pred_col_name, predicate, op_col_name, op);
-        Bytes data = Record::tuple_to_bytes(tuple);
+    for (auto &&tuple_data : tuple_lst.data) {
+        Value key = tuple_data.get_value(property.get_col_name_lst(), property.key);
+        Type::Pos pred_pos = Type::TupleData::get_col_name_pos(tuple_lst.col_name_lst, pred_col_name);
+        Type::Pos op_pos = Type::TupleData::get_col_name_pos(tuple_lst.col_name_lst, op_col_name);
+        tuple_data.set_value(pred_pos, op_pos, predicate, op);
+        Bytes data = tuple_data.en_bytes();
         bpTree.update(key, data);
     }
 }
@@ -66,8 +66,8 @@ void Table::remove(const std::string &col_name, const Value &value) {
         return;
     }
     TupleLst tuple_lst = find(col_name, value);
-    for (auto &&tuple : tuple_lst.tuple_lst) {
-        Value key = tuple.get_col_value(property.tuple_property, property.key);
+    for (auto &&tuple_data : tuple_lst.data) {
+        Value key = tuple_data.get_value(property.get_col_name_lst(), property.key);
         bpTree.remove(key);
     }
 }
@@ -75,8 +75,8 @@ void Table::remove(const std::string &col_name, const Value &value) {
 void Table::remove(const std::string &col_name, std::function<bool(Value)> predicate) {
     TupleLst tuple_lst = find(col_name, predicate);
     BpTree bpTree(property);
-    for (auto &&tuple : tuple_lst.tuple_lst) {
-        Value value = tuple.get_col_value(property.tuple_property, property.key);
+    for (auto &&td : tuple_lst.data) {
+        Value value = td.get_value(property.get_col_name_lst(), property.key);
         bpTree.remove(value);
     }
 }
@@ -172,11 +172,6 @@ std::string Table::get_key()const {
     return property.key;
 }
 
-SDB::Type::TupleProperty Table::get_tuple_property()const{
-    return property.tuple_property;
-}
-
-
 // ========= private ========
 void Table::read_meta_data(const std::string &db_name, const std::string &table_name) {
     property.db_name = db_name;
@@ -187,16 +182,8 @@ void Table::read_meta_data(const std::string &db_name, const std::string &table_
     size_t col_count;
     Function::de_bytes(col_count, bytes, offset);
     for (size_t i = 0; i < col_count; ++i) {
-        // cal name
-        std::string col_name;
-        Function::de_bytes(col_name, bytes, offset);
-        // type
-        ColType type;
-        Function::de_bytes(type, bytes, offset);
-        // type_size
-        size_t type_size;
-        Function::de_bytes(type_size, bytes, offset);
-        property.tuple_property.push_back(col_name, type, type_size);
+        Type::ColProperty cp = Type::ColProperty::de_bytes(bytes, offset);
+        property.col_property_lst.push_back(cp);
     }
     // referencing_map
     // bytes : <unordered_map> [[col_name][table_name]]*
@@ -204,10 +191,6 @@ void Table::read_meta_data(const std::string &db_name, const std::string &table_
     // referenced_map
     // bytes : <unordered_map> |[table_name][col_name]|*
     Function::de_bytes(property.referenced_map, bytes, offset);
-    // referenced_map
-    // not_null_set
-    // bytes : <unordered_set> [col_name]*
-    Function::de_bytes(property.not_null_set, bytes, offset);
 }
 
 void Table::write_meta_data(const SDB::Type::TableProperty &property) {
@@ -217,14 +200,19 @@ void Table::write_meta_data(const SDB::Type::TableProperty &property) {
     Function::bytes_append(bytes, property.key);
     // tuple property list
     // bytes : [[col_name][col_type][type_size]]*
-    Function::bytes_append(bytes, property.tuple_property.property_lst.size());
-    for (auto &&item : property.tuple_property.property_lst) {
+    Function::bytes_append(bytes, property.col_property_lst.size());
+    for (auto &&item : property.col_property_lst) {
         // col name
         Function::bytes_append(bytes, item.col_name);
         // type
         Function::bytes_append(bytes, item.col_type);
         // type size
         Function::bytes_append(bytes, item.type_size);
+        // default value
+        Bytes dv_bytes = item.default_value.en_bytes();
+        bytes.insert(bytes.end(), dv_bytes.begin(), dv_bytes.end());
+        // is not null
+        Function::bytes_append(bytes, item.is_not_null);
     }
     // referencing_map
     // bytes : <unordered_map> [[col_name][table_name]]*
@@ -232,9 +220,6 @@ void Table::write_meta_data(const SDB::Type::TableProperty &property) {
     // referenced_map
     // bytes : <unordered_map> |[table_name][col_name]|*
     Function::bytes_append(bytes, property.referenced_map);
-    // not_null_set
-    // bytes : <unordered_set> [col_name]*
-    Function::bytes_append(bytes, property.not_null_set);
 
     // write to meta file
     Cache::make().write_file(get_table_meta_path(property), bytes);

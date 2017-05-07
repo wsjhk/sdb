@@ -20,12 +20,6 @@
 namespace SDB {
 
 namespace Enum {
-    enum ColType: char {
-        INT,
-        FLOAT,
-        VARCHAR
-    };
-
     enum BVFunc: char {
         EQ,
         LESS,
@@ -45,10 +39,11 @@ namespace Const {
 } // Const namespace
 
 namespace Type {
-    using Float = float;
-    using Int = int32_t;
+    // - Pos -
     using Pos = size_t;
     using PosList = std::vector<Pos>;
+
+    //
     using Byte = char;
     using Bytes = std::vector<Byte>;
     using BytesList = std::vector<Bytes>;
@@ -178,6 +173,8 @@ namespace Function {
         t.push_back(tail);
     }
 
+    //  === en_bytes ===
+    //  en_bytes if type is base type
     template <typename T>
     inline typename std::enable_if<
             !is_container<T>::value && !Traits::PairTraits<T>::value,
@@ -186,10 +183,20 @@ namespace Function {
         std::memcpy(&t, bytes.data()+offset, sizeof(t));
         offset += sizeof(t);
     }
+    //  en_bytes if type is base type
+    template <typename T>
+    inline typename std::enable_if<
+            !is_container<T>::value && !Traits::PairTraits<T>::value,
+            void>::type
+    de_bytes(T &t, const Type::Bytes &bytes){
+        std::memcpy(&t, bytes.data(), sizeof(t));
+    }
 
+    // en_bytes if type is std::pair<> [forward define]
     template <typename Fst, typename Sec>
     inline void db_bytes(std::pair<Fst, Sec> &value, const Type::Bytes &bytes, size_t &offset);
 
+    // en_bytes if type is container but map
     template <typename T>
     inline typename std::enable_if<is_container<T>::value && !Traits::is_map<T>, void>::type
     de_bytes(T &t, const Type::Bytes &bytes, size_t &offset) {
@@ -198,11 +205,11 @@ namespace Function {
         offset += Const::SIZE_SIZE;
         for (size_t i = 0; i < len; i++) {
             typename T::value_type value;
-            static_assert(!std::is_const<decltype(value)>::value, "ads");
             de_bytes(value, bytes, offset);
             container_append(t, value);
         }
     }
+    // en_bytes if type is std::map or std::unordered_map
     template <typename T>
     inline typename std::enable_if<Traits::is_map<T>, void>::type
     de_bytes(T &t, const Type::Bytes &bytes, size_t &offset) {
@@ -219,6 +226,7 @@ namespace Function {
         }
     }
 
+    // en_bytes if type is std::pair<>
     template <typename Fst, typename Sec>
     inline void de_bytes(std::pair<Fst, Sec> &value, const Type::Bytes &bytes, size_t &offset) {
         de_bytes(value.first, bytes, offset);
@@ -238,10 +246,6 @@ namespace Function {
         Type::Bytes tail_bytes = en_bytes(tail);
         bytes.insert(bytes.end(), tail_bytes.begin(), tail_bytes.end());
     }
-
-    size_t get_type_len(Enum::ColType col_type);
-    bool is_var_type(Enum::ColType type);
-
 } // SDB::Function namespace
 
 } // SDB namespace

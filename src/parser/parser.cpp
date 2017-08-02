@@ -434,7 +434,6 @@ void Parser::print_error(std::string str){
 
 // ========== debug processing =========
 void Parser::is_r_to_deep(std::string str){
-    std::cout << "function: " << str << " begin!" << std::endl;
     r_count++;
     if (r_count > 100){
         std::cout << "recursion to deep" << std::endl;

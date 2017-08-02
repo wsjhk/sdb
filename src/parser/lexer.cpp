@@ -9,33 +9,27 @@
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 
-#include "../config/config.h"
-
 #include "lexer.h"
 // --------- Lexer Function --------
 
-const Lexer &Lexer::operator=(const Lexer &lexer){
+Lexer &Lexer::operator=(const Lexer &lexer){
     if (this == &lexer){
         return *this;
     }
-    LexerConfig cfg;
     this->tokens = lexer.tokens;
     return *this;
 }
 
 bool Lexer::is_punctuation_char(char ch){
-    auto char_set = cfg.get_punctuation_set();
-    return char_set.find(ch) != char_set.end();
+    return punctuation_char.find(ch) != punctuation_char.end();
 }
 
 bool Lexer::is_reserved_word(const std::string &str){
-    auto str_set = cfg.get_reserved_set();
-    return str_set.find(str) != str_set.end();
+    return reserved_set.find(str) != reserved_set.end();
 }
 
 bool Lexer::is_type_word(const std::string &str){
-    auto str_set = cfg.get_type_set();
-    return str_set.find(str) != str_set.end();
+    return type_set.find(str) != type_set.end();
 }
 
 std::vector<std::pair<std::string, std::string>> Lexer::tokenize(const std::string &str){

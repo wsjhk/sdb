@@ -21,6 +21,8 @@ public:
     Parser(){}
     // === Pasring ===
     Ast parsing(const std::string &str);
+
+private:
     ParserType::nodePtrVecType statement_list_processing();
     ParserType::nodePtrType statement_processing();
 

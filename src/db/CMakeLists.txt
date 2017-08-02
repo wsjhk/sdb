@@ -1,8 +1,2 @@
-cmake_minimum_required(VERSION 3.5)
-project(main)
-
-add_compile_options(-std=c++1z)
-
-file(GLOB SOURCE_FILES "*.cpp")
-add_executable(main ${SOURCE_FILES})
-target_link_libraries(main -lboost_system -lboost_filesystem)
+aux_source_directory(. DIR_DB_SRCS)
+add_library(db ${DIR_DB_SRCS})

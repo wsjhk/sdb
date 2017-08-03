@@ -16,19 +16,46 @@
 #include "src/db/db.h"
 #include "src/parser/parser.h"
 #include "src/parser/ast.h"
+#include "src/executor/executor.h"
 
 using namespace SDB;
 
 // SDB::Type::TableProperty get_table_property();
 // void db_test();
-// 
+//
+
+// shell
+void run_shell();
+
 int main(void) {
-    clock_t start = clock();
-    Parser p;
-    auto ast = p.parsing("select id from good;");
-    ast.output_graphviz("output.dot");
-    std::cout << "time:" << (double)((clock()-start))/CLOCKS_PER_SEC << std::endl;
+    run_shell();
     return 0;
+}
+
+void run_shell() {
+    Executor exector;
+    std::cout << "===============" << std::endl;
+    printf("+-+-+-+\n");
+    printf("|s|d|b|\n");
+    printf("+-+-+-+\n");
+    std::cout << "===============\n\n\n" << std::endl;
+    std::string query = "";
+    while (true) {
+        std::cout << "[sdb] -:";
+        std::string line;
+        std::getline(std::cin, line);
+        if (line == "exit") {
+            return;
+        }
+        query += line + '\n';
+        if (line.find(';') != -1) {
+            Parser p;
+            Ast ast = p.parsing(query);
+            exector.evil(ast);
+            // ast.output_graphviz("output.dot");
+            query.clear();
+        }
+    }
 }
 
 // Type::TableProperty get_table_property(){

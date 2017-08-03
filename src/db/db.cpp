@@ -26,6 +26,7 @@ void DB::drop_db(){
         table.drop_table();
     }
     IO::remove_dir(db_name);
+    is_db_drop = true;
 }
 
 void DB::create_table(const SDB::Type::TableProperty &table_property) {

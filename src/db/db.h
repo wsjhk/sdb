@@ -15,6 +15,7 @@ public:
     using TupleLst = SDB::Type::TupleLst;
 
 public:
+    DB()=delete;
     DB(const std::string &db_name):db_name(db_name){
         read_meta_data();
     }

@@ -56,7 +56,6 @@ nodePtrVecType Parser::statement_list_processing(){
 nodePtrType Parser::statement_processing() {
     is_r_to_deep("statement_processing");
 
-    std::cout << get_token_name() << std::endl;
     auto statement_name = get_token_name();
     next_token();
     nodePtrType statement_node;
@@ -72,7 +71,8 @@ nodePtrType Parser::statement_processing() {
     return statement_node;
 }
 
-// create -> create_table
+// create -> create_datebase
+//         | create_table
 //         | create_view
 nodePtrType Parser::create_processing(){
     is_r_to_deep("create_processing");
@@ -81,15 +81,26 @@ nodePtrType Parser::create_processing(){
     auto create_object = get_token_name();
     next_token();
     std::string tem_name = "create_";
-    if (create_object == "table"){
+    if (create_object == "database") {
+        ptr_vec.push_back(create_database_processing());
+    }
+    else if (create_object == "table"){
         ptr_vec = create_table_processing();
     } else if (create_object == "view") {
         ;
     } else {
         print_error(std::string("not found this create_object:"+create_object));
     }
-    std::cout << "count:" << ptr_vec.size() << std::endl;
     return std::make_shared<AstNode>(tem_name+create_object, "statement", ptr_vec);
+}
+
+nodePtrType Parser::create_database_processing() {
+    if (get_token_category() != "identifier") {
+        print_error("database name must be id");
+    }
+    std::string db_name = get_token_name();
+    next_token();
+    return std::make_shared<AstNode>(db_name, "database_name", nodePtrVecType());
 }
 
 nodePtrVecType Parser::create_table_processing(){

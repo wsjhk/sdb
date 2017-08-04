@@ -53,22 +53,32 @@ nodePtrVecType Parser::statement_list_processing(){
 //            | "insert" insert
 //            | "delete" delete
 //            | "select" query
+//            | "use" use
 nodePtrType Parser::statement_processing() {
     is_r_to_deep("statement_processing");
 
     auto statement_name = get_token_name();
     next_token();
     nodePtrType statement_node;
-    if (statement_name == "select")
+    if (statement_name == "select") {
         statement_node = query_processing();
-    else if (statement_name == "create")
+    } else if (statement_name == "create") {
         statement_node = create_processing();
-    else 
+    } else if (statement_name == "use") {
+        statement_node = use_processing();
+    } else {
         print_error(std::string("statement_name:")+statement_name+" not found!");
+    }
 
-    if (get_token_name() == ";")
-        next_token();
+    if (get_token_name() == ";") next_token();
     return statement_node;
+}
+
+nodePtrType Parser::use_processing() {
+    std::string db_name = get_token_name();
+    next_token();
+    nodePtrType name_node= std::make_shared<AstNode>(db_name, "database_name", nodePtrVecType());
+    return std::make_shared<AstNode>("use_database", "statement", nodePtrVecType{name_node});
 }
 
 // create -> create_datebase
@@ -447,7 +457,7 @@ void Parser::print_error(std::string str){
 void Parser::is_r_to_deep(std::string str){
     r_count++;
     if (r_count > 100){
-        std::cout << "recursion to deep" << std::endl;
+        std::cout << "recursion to deep: " << str << std::endl;
         exit(1);
     }
 }

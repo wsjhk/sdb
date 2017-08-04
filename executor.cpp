@@ -9,16 +9,26 @@ ResultList Executor::evil(const Ast &ast) {
     ResultList res_list;
     for (auto &&node: root->children) {
         if (node->name == "create_database") {
-            res_list.push_back(create_database(node->children[0]));
+            res_list.push_back(create_database(node));
+        } else if (node->name == "use_database") {
+            res_list.push_back(use_database(node));
         }
     }
     return res_list;
 }
 
 bool Executor::create_database(const nodePtrType &node) {
-    DB::create_db(node->name);
+    nodePtrType name_node = node->children[0];
+    DB::create_db(name_node->name);
     std::cout << "create database ";
     std::cout << node->name;
     std::cout << ", ok" << std::endl;
+    return true;
+}
+
+bool Executor::use_database(const nodePtrType &node) {
+    nodePtrType name_node = node->children[0];
+    DB::use_db(name_node->name);
+    std::cout << "database change, ok" << std::endl;
     return true;
 }

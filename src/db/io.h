@@ -21,6 +21,8 @@ public:
     SDB::Type::Bytes read_file();
     void write_file(const SDB::Type::Bytes &data);
 
+    static bool hasFile(const std::string &str);
+
     // block
     SDB::Type::Bytes read_block(size_t block_num);
     void write_block(const SDB::Type::Bytes &data, size_t block_num);

@@ -15,17 +15,22 @@ public:
     using TupleLst = SDB::Type::TupleLst;
 
 public:
-    DB()=delete;
-    DB(const std::string &db_name):db_name(db_name){
-        read_meta_data();
-    }
     ~DB()noexcept {
         if (!is_db_drop) {
             write_meta_data(db_name, table_name_set);
         }
     }
 
+    static DB& get_db() {
+        return get_db("");
+    }
+    static void use_db(const std::string &db_name) {
+        DB &db = get_db(db_name);
+        db.db_name = db_name;
+        db.read_meta_data();
+    }
     static void create_db(const std::string &db_name);
+    static bool hasDatabase(const std::string &db_name);
     void drop_db();
 
     void create_table(const SDB::Type::TableProperty &table_property);
@@ -44,6 +49,12 @@ public:
                       std::function<bool(DB::Value)> predicate);
 
 private:
+    // get_db
+    static DB &get_db(const std::string &db_name) {
+        static DB db(db_name);
+        return db;
+    }
+
     static void write_meta_data(const std::string &db_name, const TableNameSet &set);
     void read_meta_data();
 
@@ -56,10 +67,15 @@ private:
 
 
 private:
+    DB()=delete;
+    DB(const std::string &db_name):db_name(db_name){
+        read_meta_data();
+    }
+    DB(const DB &db)=delete;
+    DB &operator=(const DB &db)=delete;
     std::string db_name;
     TableNameSet table_name_set;
     bool is_db_drop = false;
 };
-
 
 #endif //DB_H

@@ -100,6 +100,14 @@ void IO::write_file(const SDB::Type::Bytes &data) {
     out.close();
 }
 
+bool IO::hasFile(const std::string &str) {
+    std::ifstream in(str);
+    if (in.is_open()){
+        return true;
+    }
+    return false;
+}
+
 size_t IO::get_file_size() const {
     struct stat file_info;
     stat(file_path.data(), &file_info);

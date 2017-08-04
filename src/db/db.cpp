@@ -17,6 +17,11 @@ void DB::create_db(const std::string &db_name) {
     write_meta_data(db_name, TableNameSet());
 }
 
+bool DB::hasDatabase(const std::string &db_name){
+    std::string file_name = IO::get_db_file_dir_path()+"/"+db_name+"/meta.sdb";
+    return IO::hasFile(file_name);
+}
+
 void DB::drop_db(){
     Cache &cache = Cache::make();
     cache.pop_file(get_meta_path(db_name));

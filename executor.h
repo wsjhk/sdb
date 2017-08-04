@@ -16,6 +16,7 @@ public:
 
 private:
     bool create_database(const ParserType::nodePtrType &node);
+    bool use_database(const ParserType::nodePtrType &node);
 };
 
 #endif /* ifndef SDB_EXECUTOR */

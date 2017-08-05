@@ -6,7 +6,6 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <boost/lexical_cast.hpp>
-#include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 
 #include "lexer.h"

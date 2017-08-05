@@ -12,11 +12,19 @@ using ResultList = std::vector<Result>;
 
 class Executor {
 public: 
+    Executor(const std::string &db_name){
+        auto db_op = DB::get_db(db_name);
+        if (db_op.has_value()) {
+            this->db = db_op.value();
+        } else {
+            std::cout << "Error: db not found" << std::endl;
+            exit(1);
+        }
+    }
     ResultList evil(const Ast &ast);
 
 private:
-    bool create_database(const ParserType::nodePtrType &node);
-    bool use_database(const ParserType::nodePtrType &node);
+    DB *db = nullptr;
 };
 
 #endif /* ifndef SDB_EXECUTOR */

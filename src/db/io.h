@@ -30,10 +30,12 @@ public:
     // get
     size_t get_file_size()const;
 
+    static std::vector<std::string> get_db_name_list();
     static std::string get_db_file_dir_path();
     static std::string get_db_file_path(const std::string &file_name);
     static void create_dir(const std::string &dir_path);
     static void remove_dir(const std::string &dir_path);
+    static void remove_dir_force(const std::string &dir_path);
 
 private:
     std::string file_path;

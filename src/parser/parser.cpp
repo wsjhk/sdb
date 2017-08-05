@@ -64,8 +64,6 @@ nodePtrType Parser::statement_processing() {
         statement_node = query_processing();
     } else if (statement_name == "create") {
         statement_node = create_processing();
-    } else if (statement_name == "use") {
-        statement_node = use_processing();
     } else {
         print_error(std::string("statement_name:")+statement_name+" not found!");
     }
@@ -74,15 +72,7 @@ nodePtrType Parser::statement_processing() {
     return statement_node;
 }
 
-nodePtrType Parser::use_processing() {
-    std::string db_name = get_token_name();
-    next_token();
-    nodePtrType name_node= std::make_shared<AstNode>(db_name, "database_name", nodePtrVecType());
-    return std::make_shared<AstNode>("use_database", "statement", nodePtrVecType{name_node});
-}
-
-// create -> create_datebase
-//         | create_table
+// create -> create_table
 //         | create_view
 nodePtrType Parser::create_processing(){
     is_r_to_deep("create_processing");
@@ -91,10 +81,7 @@ nodePtrType Parser::create_processing(){
     auto create_object = get_token_name();
     next_token();
     std::string tem_name = "create_";
-    if (create_object == "database") {
-        ptr_vec.push_back(create_database_processing());
-    }
-    else if (create_object == "table"){
+    if (create_object == "table"){
         ptr_vec = create_table_processing();
     } else if (create_object == "view") {
         ;
@@ -102,15 +89,6 @@ nodePtrType Parser::create_processing(){
         print_error(std::string("not found this create_object:"+create_object));
     }
     return std::make_shared<AstNode>(tem_name+create_object, "statement", ptr_vec);
-}
-
-nodePtrType Parser::create_database_processing() {
-    if (get_token_category() != "identifier") {
-        print_error("database name must be id");
-    }
-    std::string db_name = get_token_name();
-    next_token();
-    return std::make_shared<AstNode>(db_name, "database_name", nodePtrVecType());
 }
 
 nodePtrVecType Parser::create_table_processing(){

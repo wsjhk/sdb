@@ -3,7 +3,6 @@
 #include <stdexcept>
 #include <string>
 #include <map>
-#include <boost/filesystem.hpp>
 #include <utility>
 #include <functional>
 

@@ -28,9 +28,6 @@ private:
 
     // === create
     ParserType::nodePtrType create_processing();
-    ParserType::nodePtrType use_processing();
-    // create_database 
-    ParserType::nodePtrType create_database_processing();
     // create_table
     ParserType::nodePtrVecType create_table_processing();
     ParserType::nodePtrVecType col_def_list_processing();

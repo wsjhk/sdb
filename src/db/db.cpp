@@ -10,6 +10,9 @@
 
 using namespace SDB;
 
+// ========== static =======
+std::unordered_map<std::string, DB>DB::db_list = get_db_list();
+
 // ========== Public =======
 void DB::create_db(const std::string &db_name) {
     IO::create_dir(db_name);
@@ -17,21 +20,21 @@ void DB::create_db(const std::string &db_name) {
     write_meta_data(db_name, TableNameSet());
 }
 
-bool DB::hasDatabase(const std::string &db_name){
-    std::string file_name = IO::get_db_file_dir_path()+"/"+db_name+"/meta.sdb";
-    return IO::hasFile(file_name);
+std::optional<DB*> DB::get_db(const std::string &db_name) {
+    if (db_list.find(db_name) == db_list.end()) {
+        return {};
+    }
+    return &db_list.at(db_name);
 }
 
-void DB::drop_db(){
+bool DB::hasDatabase(const std::string &db_name){
+    return get_db(db_name).has_value();
+}
+
+void DB::drop_db(const std::string &db_name){
     Cache &cache = Cache::make();
     cache.pop_file(get_meta_path(db_name));
-    IO::delete_file(get_meta_path(db_name));
-    for (auto &&table_name : table_name_set) {
-        Table table(db_name, table_name);
-        table.drop_table();
-    }
-    IO::remove_dir(db_name);
-    is_db_drop = true;
+    IO::remove_dir_force(db_name);
 }
 
 void DB::create_table(const SDB::Type::TableProperty &table_property) {
@@ -50,7 +53,6 @@ void DB::drop_table(const std::string &table_name) {
     }
     table_name_set.erase(table_name);
     table.drop_table();
-    is_db_drop = true;
 }
 
 void DB::insert(const std::string &table_name, const Type::TupleData& tuple_data) {
@@ -107,6 +109,14 @@ DB::TupleLst DB::find(const std::string &table_name,
 }
 
 // ========== Private =======
+std::unordered_map<std::string, DB> DB::get_db_list() {
+    std::unordered_map<std::string, DB> ret;
+    for(auto &&name: IO::get_db_name_list()) {
+        ret.insert_or_assign(name, DB(name));
+    }
+    return ret;
+}
+
 void DB::write_meta_data(const std::string &db_name, const TableNameSet &set) {
     Type::Bytes bytes;
     Function::bytes_append(bytes, set);

@@ -13,7 +13,6 @@
 #include "src/db/bpTree.h"
 #include "src/db/cache.h"
 #include "src/db/io.h"
-#include "src/db/db.h"
 #include "src/parser/parser.h"
 #include "src/parser/ast.h"
 #include "executor.h"
@@ -21,20 +20,31 @@
 using namespace SDB;
 
 // shell
-void run_shell();
+void run_shell(const std::string &db_name);
 
-int main(void) {
-    run_shell();
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        std::cout << "错误命令" << std::endl;
+        exit(1);
+    }
+    std::string command = argv[1];
+    if (command == "createdb") {
+        DB::create_db(argv[2]);
+    } else if (command == "dropdb") {
+        DB::drop_db(argv[2]);
+    } else if (command == "use") {
+        run_shell(argv[2]);
+    }
     return 0;
 }
 
-void run_shell() {
-    Executor exector;
+void run_shell(const std::string &db_name) {
+    Executor exector(db_name);
     std::cout << "===============" << std::endl;
     printf("+-+-+-+\n");
     printf("|s|d|b|\n");
     printf("+-+-+-+\n");
-    std::cout << "===============\n\n\n" << std::endl;
+    std::cout << "===============\n\n" << std::endl;
     std::string query = "";
     while (true) {
         std::cout << "[sdb] -:";

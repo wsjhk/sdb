@@ -8,8 +8,8 @@
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
-#include <boost/filesystem.hpp>
 #include <boost/format.hpp>
+#include <experimental/filesystem>
 
 #include "io.h"
 #include "util.h"
@@ -17,7 +17,7 @@
 using std::ios;
 using SDB::Const::BLOCK_SIZE;
 using SDB::Type::Bytes;
-namespace bf = boost::filesystem;
+namespace ef = std::experimental::filesystem;
 
 // ========= public =========
 void IO::create_file(const std::string &file_name) {
@@ -33,7 +33,7 @@ void IO::create_file(const std::string &file_name) {
 }
 
 void IO::delete_file(const std::string &file_name) {
-    bool bl = bf::remove(get_db_file_path(file_name));
+    bool bl = ef::remove(get_db_file_path(file_name));
 }
 
 void IO::write_block(const SDB::Type::Bytes &data, size_t block_num){
@@ -114,8 +114,19 @@ size_t IO::get_file_size() const {
     return (size_t)(file_info.st_size);
 }
 
+std::vector<std::string> IO::get_db_name_list() {
+    std::vector<std::string> ret;
+    ef::path db_path(get_db_file_dir_path());
+    ef::directory_iterator it(db_path);
+    ef::directory_iterator end_it;
+    for (; it != end_it; it++) {
+        ret.push_back(it->path().filename());
+    }
+    return ret;
+}
+
 std::string IO::get_db_file_dir_path() {
-    auto dir_path = bf::path(__FILE__).parent_path();
+    auto dir_path = ef::path(__FILE__).parent_path();
     std::string file_path = dir_path.generic_string()+"/data";
     return file_path;
 }
@@ -127,9 +138,13 @@ std::string IO::get_db_file_path(const std::string &file_name) {
 }
 
 void IO::create_dir(const std::string &dir_path) {
-    bf::create_directories(get_db_file_dir_path()+"/"+dir_path);
+    ef::create_directories(get_db_file_dir_path()+"/"+dir_path);
 }
 
 void IO::remove_dir(const std::string &dir_path) {
-    bf::remove(get_db_file_dir_path()+"/"+dir_path);
+    ef::remove(get_db_file_dir_path()+"/"+dir_path);
+}
+
+void IO::remove_dir_force(const std::string &dir_path) {
+    ef::remove_all(get_db_file_dir_path()+"/"+dir_path);
 }

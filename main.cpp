@@ -28,12 +28,17 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     std::string command = argv[1];
+    std::string obj = argv[2];
     if (command == "createdb") {
-        DB::create_db(argv[2]);
+        DB::create_db(obj);
     } else if (command == "dropdb") {
-        DB::drop_db(argv[2]);
+        DB::drop_db(obj);
     } else if (command == "use") {
-        run_shell(argv[2]);
+        run_shell(obj);
+    } else if (command == "list" && obj == "db") {
+        for (auto &&name: IO::get_db_name_list()) {
+            std::cout << name << std::endl;
+        }
     }
     return 0;
 }

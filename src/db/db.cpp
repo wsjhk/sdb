@@ -10,8 +10,22 @@
 
 using namespace SDB;
 
-// ========== static =======
-std::unordered_map<std::string, DB>DB::db_list = get_db_list();
+// ========== Master =======
+struct DB::Master {
+    std::unordered_map<std::string, DB> db_list;
+    Master():db_list(get_db_list()){}
+    ~Master()noexcept;
+};
+
+DB::Master::~Master() {
+    for (auto &&p: db_list) {
+        auto &&ps = p.second;
+        ps.write_meta_data(ps.db_name, ps.table_name_set);
+    }
+    db_list.clear();
+}
+
+std::shared_ptr<DB::Master> DB::master = std::make_shared<DB::Master>();
 
 // ========== Public =======
 void DB::create_db(const std::string &db_name) {
@@ -21,10 +35,10 @@ void DB::create_db(const std::string &db_name) {
 }
 
 std::optional<DB*> DB::get_db(const std::string &db_name) {
-    if (db_list.find(db_name) == db_list.end()) {
+    if (master->db_list.find(db_name) == master->db_list.end()) {
         return {};
     }
-    return &db_list.at(db_name);
+    return &master->db_list.at(db_name);
 }
 
 bool DB::hasDatabase(const std::string &db_name){
@@ -35,6 +49,7 @@ void DB::drop_db(const std::string &db_name){
     Cache &cache = Cache::make();
     cache.pop_file(get_meta_path(db_name));
     IO::remove_dir_force(db_name);
+    master->db_list.erase(db_name);
 }
 
 void DB::create_table(const SDB::Type::TableProperty &table_property) {

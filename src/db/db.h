@@ -15,10 +15,6 @@ public:
     using TupleLst = SDB::Type::TupleLst;
 
 public:
-    ~DB()noexcept {
-        write_meta_data(db_name, table_name_set);
-    }
-
     // get_db
     static void create_db(const std::string &db_name);
     static std::optional<DB*> get_db(const std::string &db_name);
@@ -63,7 +59,8 @@ private:
 
 
 private:
-    static std::unordered_map<std::string, DB> db_list;
+    struct Master;
+    static std::shared_ptr<Master> master;
     std::string db_name;
     TableNameSet table_name_set;
 };

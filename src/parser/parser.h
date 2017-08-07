@@ -19,9 +19,9 @@
 
 class Parser{
 public:
-    Parser(){}
+    Parser(const std::string str);
     // === Pasring ===
-    Result<Ast, std::string> parsing(const std::string &str);
+    Result<Ast, std::string> parsing();
 
 private:
     ParserType::nodePtrVecType statement_list_processing();
@@ -75,7 +75,6 @@ private:
     void is_r_to_deep(std::string str);
 
 private:
-    u_int r_count = 0;
     ParserType::tokenVecType::const_iterator iter;
     ParserType::tokenVecType::const_iterator iter_end;
 };

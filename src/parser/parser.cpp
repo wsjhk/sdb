@@ -21,13 +21,15 @@ using namespace ParserType;
 
 // ========== Parser function =========
 // input -> statemant_list
-Result<Ast, std::string> Parser::parsing(const std::string &str){
-    is_r_to_deep("parsing");
-
+Parser::Parser(const std::string str) {
     Lexer lexer;
     auto tokens = lexer.tokenize(str);
     iter = tokens.cbegin();
     iter_end = tokens.cend();
+}
+
+Result<Ast, std::string> Parser::parsing(){
+    is_r_to_deep("parsing");
     try {
         auto ptr_vec = statement_list_processing();
         auto root = std::make_shared<AstNode>("root", "root", ptr_vec);
@@ -436,6 +438,7 @@ void Parser::error(std::string str){
 
 // ========== debug processing =========
 void Parser::is_r_to_deep(std::string str){
+    static int r_count = 0;
     r_count++;
     if (r_count > 1000){
         Log::log(str);

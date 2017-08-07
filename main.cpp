@@ -63,8 +63,8 @@ void run_shell(const std::string &db_name) {
         }
         query += line + '\n';
         if (line.find(';') != std::string::npos) {
-            Parser p;
-            auto ast_res = p.parsing(query);
+            Parser p(query);
+            auto ast_res = p.parsing();
             auto vp = [executor, &query](const Ast &ast){
                 executor->evil(ast);
                 query.clear();

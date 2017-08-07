@@ -3,8 +3,9 @@
 
 #include <string>
 #include <unordered_set>
-#include "util.h"
+#include <utility>
 #include "table.h"
+#include "../util/result.hpp"
 
 class DB {
 public:
@@ -17,7 +18,7 @@ public:
 public:
     // get_db
     static void create_db(const std::string &db_name);
-    static std::optional<DB*> get_db(const std::string &db_name);
+    static Result<DB*, std::string> get_db(const std::string &db_name);
     static bool hasDatabase(const std::string &db_name);
     static void drop_db(const std::string &db_name);
 
@@ -41,9 +42,6 @@ private:
     DB(const std::string &db_name):db_name(db_name){
         read_meta_data();
     }
-    // DB(const DB &db)=delete;
-    // DB(DB &&db):db_name(std::move(db.db_name)), table_name_set(std::move(db.table_name_set)){}
-    // DB &operator=(const DB &&db)=delete;
 
     static std::unordered_map<std::string, DB> get_db_list();
 

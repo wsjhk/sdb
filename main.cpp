@@ -8,14 +8,12 @@
 #include <functional>
 #include <memory>
 
-#include "src/db/table.h"
 #include "src/db/util.h"
-#include "src/db/bpTree.h"
-#include "src/db/cache.h"
 #include "src/db/io.h"
 #include "src/parser/parser.h"
 #include "src/parser/ast.h"
 #include "executor.h"
+#include "src/util/result.hpp"
 
 using namespace SDB;
 
@@ -44,7 +42,11 @@ int main(int argc, char *argv[]) {
 }
 
 void run_shell(const std::string &db_name) {
-    Executor exector(db_name);
+    auto res = Executor::make(db_name);
+    auto fe = [](std::string msg){
+        std::cerr << msg << std::endl;
+    };
+    _VaOrEr(std::shared_ptr<Executor> executor, fe);
     std::cout << "===============" << std::endl;
     printf("+-+-+-+\n");
     printf("|s|d|b|\n");
@@ -52,18 +54,25 @@ void run_shell(const std::string &db_name) {
     std::cout << "===============\n\n" << std::endl;
     std::string query = "";
     while (true) {
-        std::cout << "[sdb] -:";
+        std::cout << "\n[sdb] -:";
         std::string line;
         std::getline(std::cin, line);
+        std::cin.clear();
         if (line == "exit") {
             return;
         }
         query += line + '\n';
         if (line.find(';') != std::string::npos) {
             Parser p;
-            Ast ast = p.parsing(query);
-            exector.evil(ast);
-            query.clear();
+            auto ast_res = p.parsing(query);
+            auto vp = [executor, &query](const Ast &ast){
+                executor->evil(ast);
+                query.clear();
+            };
+            auto ep = [](auto msg){
+                std::cout << msg << std::endl;
+            };
+            _VpOrEp(ast_res, vp, ep);
         }
     }
 }

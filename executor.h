@@ -7,24 +7,22 @@
 #include "src/db/db.h"
 #include "src/parser/type.h"
 
-using Result = std::variant<bool, SDB::Type::TupleLst>;
-using ResultList = std::vector<Result>;
+using EvilResult = std::variant<std::string, SDB::Type::TupleLst>;
+using EvilResultList = std::vector<EvilResult>;
 
 class Executor {
 public: 
-    Executor(const std::string &db_name){
-        auto db_op = DB::get_db(db_name);
-        if (db_op.has_value()) {
-            this->db = db_op.value();
-        } else {
-            std::cout << "Error: db not found" << std::endl;
-            exit(1);
-        }
-    }
-    ResultList evil(const Ast &ast);
+    Executor(DB *db):db(db){}
+    static Result<std::shared_ptr<Executor>, std::string> make(const std::string &db_name);
+    EvilResultList evil(const Ast &ast);
+
+    // evil function
+    std::string create_table(const ParserType::nodePtrType &ptr);
+
 
 private:
-    DB *db = nullptr;
+    Executor()=delete;
+    DB *db;
 };
 
 #endif /* ifndef SDB_EXECUTOR */

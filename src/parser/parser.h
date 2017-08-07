@@ -15,12 +15,13 @@
 
 #include "ast.h"
 #include "type.h"
+#include "../util/result.hpp"
 
 class Parser{
 public:
     Parser(){}
     // === Pasring ===
-    Ast parsing(const std::string &str);
+    Result<Ast, std::string> parsing(const std::string &str);
 
 private:
     ParserType::nodePtrVecType statement_list_processing();
@@ -68,7 +69,7 @@ private:
     std::string get_token_category()const{return iter->second; }
 
     // === error ===
-    void print_error(std::string str);
+    void error(std::string str);
 
     // === debug ===
     void is_r_to_deep(std::string str);

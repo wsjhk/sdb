@@ -17,7 +17,7 @@ struct DB::Master {
     ~Master()noexcept;
 };
 
-DB::Master::~Master() {
+DB::Master::~Master()noexcept{
     for (auto &&p: db_list) {
         auto &&ps = p.second;
         ps.write_meta_data(ps.db_name, ps.table_name_set);
@@ -34,11 +34,11 @@ void DB::create_db(const std::string &db_name) {
     write_meta_data(db_name, TableNameSet());
 }
 
-std::optional<DB*> DB::get_db(const std::string &db_name) {
+Result<DB*, std::string> DB::get_db(const std::string &db_name) {
     if (master->db_list.find(db_name) == master->db_list.end()) {
-        return {};
+        return Err<std::string>("Error: db not found!");
     }
-    return &master->db_list.at(db_name);
+    return Ok<DB*>(&master->db_list.at(db_name));
 }
 
 bool DB::hasDatabase(const std::string &db_name){

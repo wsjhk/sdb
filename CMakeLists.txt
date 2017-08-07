@@ -5,7 +5,6 @@ add_compile_options(-std=c++1z)
 
 add_subdirectory(src/db)
 add_subdirectory(src/parser)
-# add_subdirectory(src/executor)
 
 aux_source_directory(. DIR_SRCS)
 add_executable(sdb ${DIR_SRCS})

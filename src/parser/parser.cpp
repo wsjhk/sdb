@@ -9,6 +9,8 @@
 
 #include "lexer.h"
 #include "ast.h"
+#include "../util/str.hpp"
+#include "../util/log.hpp"
 
 #include "parser.h"
 // ========== Type or namespace =========
@@ -19,17 +21,20 @@ using namespace ParserType;
 
 // ========== Parser function =========
 // input -> statemant_list
-Ast Parser::parsing(const std::string &str){
+Result<Ast, std::string> Parser::parsing(const std::string &str){
     is_r_to_deep("parsing");
 
     Lexer lexer;
     auto tokens = lexer.tokenize(str);
     iter = tokens.cbegin();
     iter_end = tokens.cend();
-    auto ptr_vec = statement_list_processing();
-    
-    auto root = std::make_shared<AstNode>("root", "root", ptr_vec);
-    return Ast(root);
+    try {
+        auto ptr_vec = statement_list_processing();
+        auto root = std::make_shared<AstNode>("root", "root", ptr_vec);
+        return Ok<Ast>(root);
+    } catch (std::runtime_error e) {
+        return Err<std::string>(e.what());
+    }
 }
 
 // statement_list -> statement ";" statement_list
@@ -65,7 +70,7 @@ nodePtrType Parser::statement_processing() {
     } else if (statement_name == "create") {
         statement_node = create_processing();
     } else {
-        print_error(std::string("statement_name:")+statement_name+" not found!");
+        error(std::string("statement_name:")+statement_name+" not found!");
     }
 
     if (get_token_name() == ";") next_token();
@@ -86,7 +91,7 @@ nodePtrType Parser::create_processing(){
     } else if (create_object == "view") {
         ;
     } else {
-        print_error(std::string("not found this create_object:"+create_object));
+        error(std::string("not found this create_object:"+create_object));
     }
     return std::make_shared<AstNode>(tem_name+create_object, "statement", ptr_vec);
 }
@@ -97,14 +102,18 @@ nodePtrVecType Parser::create_table_processing(){
     nodePtrVecType ptr_vec;
 
     auto token_name = get_token_name();
-    std::cout << "table_name:" << token_name << std::endl;
-    next_token();
+    if (token_name == "("){
+        error(Str::format("don't has table name!"));
+    } else if (get_token_category() != "identifier") {
+        error(Str::format("table name[%s] isn't identifier", token_name));
+    }
 
+    next_token();
     auto table_name_node = std::make_shared<AstNode>(token_name, "table_name", nodePtrVecType());
     ptr_vec.push_back(table_name_node);
 
     if (get_token_name() != "("){
-        print_error(std::string("the word not (:")+get_token_name());
+        error(Str::format("the word[%s] not (", get_token_name()));
     }
     next_token();
     auto col_ptr_vec = col_def_list_processing();
@@ -138,12 +147,10 @@ nodePtrVecType Parser::col_def_list_processing(){
 nodePtrType Parser::col_def_processing(){
     is_r_to_deep("col_def_processing");
 
-    std::cout << get_token_name() << std::endl;
-    std::cout << get_token_category() << std::endl;
     if (is_end()){
-        print_error("end");
+        error("end");
     } else if (get_token_category() != "identifier"){
-        print_error(get_token_name()+" is not identifier");
+        error(get_token_name()+" is not identifier");
     }
     std::vector<std::shared_ptr<AstNode>> ptr_vec;
     auto col_name = get_token_name();
@@ -161,7 +168,7 @@ nodePtrVecType Parser::col_def_context_list_processing(){
     is_r_to_deep("col_def_context_list_processing");
 
     if (iter == iter_end){
-        print_error("def list");
+        error("def list");
     }
     std::unordered_set<std::string> type_def_set = {
         "int", "char", "varchar", "float", "smallint"
@@ -171,7 +178,6 @@ nodePtrVecType Parser::col_def_context_list_processing(){
     nodePtrVecType ptr_vec;
     while (iter != iter_end){
         auto fst = get_token_name();
-        std::cout << "fst:" << fst << std::endl;
         if (fst == ","){
             next_token();
             return ptr_vec;
@@ -180,15 +186,15 @@ nodePtrVecType Parser::col_def_context_list_processing(){
         } else if (type_def_set.find(fst) != type_def_set.cend()){
             auto type_node_ptr = col_type_def();
             if (was_type_def)
-                print_error("col type already def");
+                error("col type already def");
             ptr_vec.push_back(type_node_ptr);
             was_type_def = true;
         } else if (fst == "not") {
             if (was_not_null_def)
-                print_error("col not_null already def");
+                error("col not_null already def");
             ptr_vec.push_back(col_not_null_def());
         } else {
-            print_error("def not found");
+            error("def not found");
         }
     }
     return ptr_vec;
@@ -203,7 +209,7 @@ nodePtrType Parser::col_type_def(){
         auto scd = next_token();
         auto trd = next_token().first;
         if (fst != "(" && scd.second != "identifier" && trd != ")"){
-            print_error(type_name+" def error");
+            error(type_name+" def error");
         }
         node_ptr->children.push_back(std::make_shared<AstNode>(scd.first, "type_length", nodePtrVecType()));
     }
@@ -214,7 +220,7 @@ nodePtrType Parser::col_not_null_def(){
     next_token();
     auto token_name = get_token_name();
     if (token_name != "null")
-        print_error("not null");
+        error("not null");
     next_token();
     return std::make_shared<AstNode>("not_null", "not_null", nodePtrVecType());
 }
@@ -226,7 +232,7 @@ nodePtrType Parser::col_primary_def_processing(){
     auto scd = next_token().first;
     auto trd = next_token().first;
     if (fst != "primary" && scd != "key" && trd != "(")
-        print_error("primary def error");
+        error("primary def error");
     auto ptr_vec = col_name_list_processing(")");
     next_token();
     return std::make_shared<AstNode>("primary_def", "primary_def", ptr_vec);
@@ -257,16 +263,15 @@ nodePtrType Parser::col_foreign_def_processing(){
     next_token();
     auto fst = next_token().first;
     if (is_end() || fst != "("){
-        print_error("foreign def");
+        error("foreign def");
     }
     auto col_ptr_vec = col_name_list_processing(")");
     auto col_name_list_ptr = std::make_shared<AstNode>("col_name_list", "col_name_list", col_ptr_vec);
     fst = next_token().first;
     if (fst != "references"){
-        print_error("need take a references table");
+        error("need take a references table");
     }
     fst = next_token().first;
-    std::cout << fst << std::endl;
     auto table_name_ptr = std::make_shared<AstNode>(fst, "table_name", nodePtrVecType());
     ptr_vec.push_back(table_name_ptr);
     ptr_vec.push_back(col_name_list_ptr);
@@ -387,13 +392,12 @@ nodePtrType Parser::predicate_bool_processing(){
 nodePtrVecType Parser::predicate_and_dot_processing(){
     is_r_to_deep("predicate_and_dot_processing begin");
     
-    std::cout << get_token_name() << std::endl;
     if (is_end() || get_token_name() == "or" || get_token_name() == ";"){
         return nodePtrVecType();
     } 
 
     if (get_token_name() != "and"){
-        print_error("need a and");
+        error("need a and");
     }
 
     next_token();
@@ -413,11 +417,10 @@ nodePtrVecType Parser::predicate_or_dot_processing(){
     } 
 
     if (get_token_name() != "or"){
-        print_error("need a or");
+        error("need a or");
     }
 
     next_token();
-    std::cout << "or:" << get_token_name() << std::endl;
     nodePtrVecType ptr_vec;
     auto ptr = predicate_and_processing();
     ptr_vec.push_back(ptr);
@@ -427,15 +430,15 @@ nodePtrVecType Parser::predicate_or_dot_processing(){
 }
 
 // ========== error processing =========
-void Parser::print_error(std::string str){
-    throw std::runtime_error(std::string("Error: ")+str);
+void Parser::error(std::string str){
+    throw std::runtime_error(std::string("Syntax Error: ")+str);
 }
 
 // ========== debug processing =========
 void Parser::is_r_to_deep(std::string str){
     r_count++;
-    if (r_count > 100){
-        std::cout << "recursion to deep: " << str << std::endl;
+    if (r_count > 1000){
+        Log::log(str);
         exit(1);
     }
 }

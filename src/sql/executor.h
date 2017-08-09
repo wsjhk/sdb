@@ -3,9 +3,9 @@
 
 #include <variant>
 
-#include "src/parser/ast.h"
-#include "src/db/db.h"
-#include "src/parser/type.h"
+#include "ast.h"
+#include "../db/db.h"
+#include "type.h"
 
 using EvilResult = std::variant<std::string, SDB::Type::TupleLst>;
 using EvilResultList = std::vector<EvilResult>;

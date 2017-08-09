@@ -1,6 +1,6 @@
 #include "executor.h"
-#include "src/db/db.h"
-#include "src/parser/type.h"
+#include "../db/db.h"
+#include "type.h"
 
 using ParserType::nodePtrType;
 

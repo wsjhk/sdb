@@ -10,9 +10,9 @@
 
 #include "src/db/util.h"
 #include "src/db/io.h"
-#include "src/parser/parser.h"
-#include "src/parser/ast.h"
-#include "executor.h"
+#include "src/sql/parser.h"
+#include "src/sql/ast.h"
+#include "src/sql/executor.h"
 #include "src/util/result.hpp"
 
 using namespace SDB;

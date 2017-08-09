@@ -14,7 +14,7 @@ DB layer 已经实现表的增删查改和索引功能，已经支持foreign key
 
 3. src/db/bptree
 
-    B+Tree的实现,支持针对主键增删查改.尚未重建索引和动态添加索引.
+    B+Tree的实现,支持针对主键增删查改.尚未实现重建索引和动态添加索引.
 
 4. src/db/table
 
@@ -22,7 +22,7 @@ DB layer 已经实现表的增删查改和索引功能，已经支持foreign key
 
 5. src/db/cache
 
-    缓冲器，实现了读写时间复杂度都为O(1)的LRU缓冲算法．
+    缓冲器，实现了读写时间复杂度都为O(1)的LFU缓冲算法．
 
 6. src/db/db
 
@@ -30,7 +30,7 @@ DB layer 已经实现表的增删查改和索引功能，已经支持foreign key
 
 ### SQL Layer
 
-1.  SQL Parser(src/parser)
+1.  SQL Parser(src/sql/parser)
 
     手写的SQL递归下降语法分析器,暂时只支持少量DDL/DML,完整的实现需要等到DB Layer成熟之后开始实现.
 
@@ -38,6 +38,6 @@ DB layer 已经实现表的增删查改和索引功能，已经支持foreign key
 
     SQL的优化,尚未实现.
 
-3.  SQL Executor
+3.  SQL Executor(sql/sql/executor)
 
-    SQL执行器,尚未实现.
+    todo ...

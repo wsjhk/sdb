@@ -12,7 +12,7 @@
 
 class Lexer{
 public:
-    Lexer():punctuation_char(get_punctuation_set()), reserved_set(get_reserved_set()){}
+    Lexer(){}
     Lexer(const Lexer &lexer){*this=lexer;}
     Lexer &operator=(const Lexer &lexer);
 
@@ -44,13 +44,14 @@ public:
 
     // get set
     const std::unordered_set<char> get_punctuation_set() {
-        return std::unordered_set<char>{
+        static const std::unordered_set<char> punctuation_set = {
              ',', '$', ':', ';', '*', '.', '+', '<', '>','=', '(', ')'
         };
+        return punctuation_set;
     }
 
-    const std::unordered_set<std::string> get_reserved_set() {
-        return std::unordered_set<std::string>{
+    static const std::unordered_set<std::string> get_reserved_set() {
+        static const std::unordered_set<std::string> reserved_set = {
             "all", "alter", "and", "any", "array", "arrow", "as",
             "asc", "at", "begin", "between", "by", "case", "check",
             "clusters", "cluster", "colauth", "columns", "compress", "connect", "crash",
@@ -66,22 +67,19 @@ public:
             "unique", "update", "use", "values", "view", "views", "when",
             "where", "with"
         };
+        return reserved_set;
     }
 
-    const std::unordered_set<std::string> get_type_set() {
-        return std::unordered_set<std::string>{
-            "int", "smallint", "float", "char", "varchar", "numberic"
+    static const std::unordered_set<std::string> get_type_set() {
+        static const std::unordered_set<std::string> type_name_set = {
+            "int", "smallint", "float", "varchar"
         };
+        return type_name_set;
     }
 
 private:
     // token集，lexer返回的值
     std::vector<std::pair<std::string, std::string>> tokens;
-
-    // set
-    const std::unordered_set<char> punctuation_char;
-    const std::unordered_set<std::string> reserved_set;
-    const std::unordered_set<std::string> type_set;
 
     // iter
     std::string::const_iterator iter;

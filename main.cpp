@@ -46,7 +46,7 @@ void run_shell(const std::string &db_name) {
     auto fe = [](std::string msg){
         std::cerr << msg << std::endl;
     };
-    _VaOrEr(std::shared_ptr<Executor> executor, fe);
+    _VaOrEpr(res, std::shared_ptr<Executor> executor, fe);
     std::cout << "===============" << std::endl;
     printf("+-+-+-+\n");
     printf("|s|d|b|\n");
@@ -65,14 +65,13 @@ void run_shell(const std::string &db_name) {
         if (line.find(';') != std::string::npos) {
             Parser p(query);
             auto ast_res = p.parsing();
-            auto vp = [executor, &query](const Ast &ast){
-                executor->evil(ast);
-                query.clear();
-            };
             auto ep = [](auto msg){
                 std::cout << msg << std::endl;
             };
-            _VpOrEp(ast_res, vp, ep);
+            _VaOrEpr(ast_res, Ast ast, ep);
+            ast.output_graphviz("output.dot");
+            executor->execute(ast);
+            query.clear();
         }
     }
 }

@@ -12,8 +12,8 @@ struct AstNode{
 
     AstNode (){}
     AstNode (const std::string &n):name(n){}
-    AstNode (const std::string &n, const std::vector<std::shared_ptr<AstNode>> &c)
-        :name(n), children(c){}
+    AstNode (const std::string &n, const std::string &type)
+        :name(n), type(type){}
     AstNode (const std::string &n, const std::string &type,
             const std::vector<std::shared_ptr<AstNode>> &c)
         :name(n), type(type), children(c){}

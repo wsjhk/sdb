@@ -20,14 +20,17 @@ Lexer &Lexer::operator=(const Lexer &lexer){
 }
 
 bool Lexer::is_punctuation_char(char ch){
-    return punctuation_char.find(ch) != punctuation_char.end();
+    auto punctuation_set = get_punctuation_set();
+    return punctuation_set.find(ch) != punctuation_set.end();
 }
 
 bool Lexer::is_reserved_word(const std::string &str){
+    auto reserved_set = get_reserved_set();
     return reserved_set.find(str) != reserved_set.end();
 }
 
 bool Lexer::is_type_word(const std::string &str){
+    auto type_set = get_type_set();
     return type_set.find(str) != type_set.end();
 }
 

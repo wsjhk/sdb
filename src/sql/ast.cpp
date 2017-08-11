@@ -12,6 +12,7 @@ void Ast::output_graphviz(const std::string &filename)const{
         std::cout << filename << " not found!" << std::endl;
         exit(1);
     }
+    out << "digraph G {\n";
     auto str = get_graphviz(root, 0, "");
     out.write(str.c_str(), str.length());
     out << "}";

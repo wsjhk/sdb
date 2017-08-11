@@ -23,7 +23,11 @@ using namespace ParserType;
 // input -> statemant_list
 Parser::Parser(const std::string str) {
     Lexer lexer;
-    auto tokens = lexer.tokenize(str);
+    this->tokens = lexer.tokenize(str);
+//     for (auto &&token : tokens) {
+//         std::cout << "fst: " << token.first << std::endl;
+//         std::cout << "snd: " << token.second << std::endl;
+//     }
     iter = tokens.cbegin();
     iter_end = tokens.cend();
 }
@@ -105,7 +109,7 @@ nodePtrVecType Parser::create_table_processing(){
 
     auto token_name = get_token_name();
     if (token_name == "("){
-        error(Str::format("don't has table name!"));
+        error("don't has table name!");
     } else if (get_token_category() != "identifier") {
         error(Str::format("table name[%s] isn't identifier", token_name));
     }
@@ -159,6 +163,8 @@ nodePtrType Parser::col_def_processing(){
     auto col_name_node = std::make_shared<AstNode>(col_name, "col_name", nodePtrVecType());
     ptr_vec.push_back(col_name_node);
     next_token();
+    auto type_node_ptr = col_type_def();
+    ptr_vec.push_back(type_node_ptr);
 
     auto def_ptr_vec = col_def_context_list_processing();
     auto def_list_ptr = std::make_shared<AstNode>("col_def_context", "col_def_context", def_ptr_vec);
@@ -169,14 +175,6 @@ nodePtrType Parser::col_def_processing(){
 nodePtrVecType Parser::col_def_context_list_processing(){
     is_r_to_deep("col_def_context_list_processing");
 
-    if (iter == iter_end){
-        error("def list");
-    }
-    std::unordered_set<std::string> type_def_set = {
-        "int", "char", "varchar", "float", "smallint"
-    };
-    bool was_type_def = false;
-    bool was_not_null_def = false;
     nodePtrVecType ptr_vec;
     while (iter != iter_end){
         auto fst = get_token_name();
@@ -185,16 +183,15 @@ nodePtrVecType Parser::col_def_context_list_processing(){
             return ptr_vec;
         } else if (fst == ")"){
             return ptr_vec;
-        } else if (type_def_set.find(fst) != type_def_set.cend()){
-            auto type_node_ptr = col_type_def();
-            if (was_type_def)
-                error("col type already def");
-            ptr_vec.push_back(type_node_ptr);
-            was_type_def = true;
         } else if (fst == "not") {
-            if (was_not_null_def)
-                error("col not_null already def");
             ptr_vec.push_back(col_not_null_def());
+        } else if (fst == "primary") {
+            next_token();
+            if (is_end() || get_token_name() != "key") {
+                error("primary key error");
+            }
+            ptr_vec.push_back(std::make_shared<AstNode>("primary key", "primary key"));
+            next_token();
         } else {
             error("def not found");
         }
@@ -203,10 +200,17 @@ nodePtrVecType Parser::col_def_context_list_processing(){
 }
 
 nodePtrType Parser::col_type_def(){
+    if (is_end()) {
+        error(Str::format("column type define errer"));
+    }
     auto type_name = get_token_name();
+    std::unordered_set<std::string> type_set = Lexer::get_type_set();
+    if (type_set.find(type_name) == type_set.end()) {
+        error(Str::format("[%s] is not type name", type_name));
+    }
     nodePtrType node_ptr = std::make_shared<AstNode>(type_name, "type_def", nodePtrVecType());
     next_token();
-    if (type_name != "int" && type_name != "smallint"){
+    if (type_name == "varchar") {
         auto fst = next_token().first;
         auto scd = next_token();
         auto trd = next_token().first;
@@ -221,8 +225,9 @@ nodePtrType Parser::col_type_def(){
 nodePtrType Parser::col_not_null_def(){
     next_token();
     auto token_name = get_token_name();
-    if (token_name != "null")
+    if (token_name != "null") {
         error("not null");
+    }
     next_token();
     return std::make_shared<AstNode>("not_null", "not_null", nodePtrVecType());
 }
@@ -233,10 +238,10 @@ nodePtrType Parser::col_primary_def_processing(){
     auto fst = next_token().first;
     auto scd = next_token().first;
     auto trd = next_token().first;
-    if (fst != "primary" && scd != "key" && trd != "(")
+    if (fst != "primary" && scd != "key" && trd != "(") {
         error("primary def error");
+    }
     auto ptr_vec = col_name_list_processing(")");
-    next_token();
     return std::make_shared<AstNode>("primary_def", "primary_def", ptr_vec);
 }
 

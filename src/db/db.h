@@ -21,7 +21,9 @@ public:
     static Result<DB*, std::string> get_db(const std::string &db_name);
     static bool hasDatabase(const std::string &db_name);
     static void drop_db(const std::string &db_name);
-
+    std::string get_db_name()const {
+        return db_name;
+    }
     void create_table(const SDB::Type::TableProperty &table_property);
     void drop_table(const std::string &table_name);
     void insert(const std::string &table_name, const SDB::Type::TupleData &tuple_data);

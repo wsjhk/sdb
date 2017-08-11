@@ -8,6 +8,7 @@
 
 namespace SDB::Enum {
     enum ColType : char {
+        NONE,
         TINYINT,
         SMALLINT,
         INT,
@@ -281,11 +282,14 @@ struct ColProperty {
 
 // table property
 struct TableProperty {
+    // type alias
+    using ColPropertyList = std::vector<ColProperty>;
+
     // Type
     std::string db_name;
     std::string table_name;
     std::string key;
-    std::vector<ColProperty> col_property_lst;
+    ColPropertyList col_property_lst;
     // integrity
     // <table_name, col_name>
     std::unordered_map<std::string, std::string> referencing_map;
@@ -296,7 +300,7 @@ struct TableProperty {
     TableProperty(const std::string &db_name,
                   const std::string &table_name,
                   const std::string &key,
-                  const std::vector<ColProperty> &col_property_lst)
+                  const ColPropertyList &col_property_lst)
             :db_name(db_name), table_name(table_name), key(key), col_property_lst(col_property_lst){}
 
     // getter

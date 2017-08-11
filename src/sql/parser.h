@@ -67,7 +67,7 @@ private:
     bool is_end()const{return iter == iter_end; }
     std::string get_token_name()const{return iter->first; }
     std::string get_token_category()const{return iter->second; }
-
+    
     // === error ===
     void error(std::string str);
 
@@ -75,6 +75,7 @@ private:
     void is_r_to_deep(std::string str);
 
 private:
+    std::vector<ParserType::tokenType> tokens;
     ParserType::tokenVecType::const_iterator iter;
     ParserType::tokenVecType::const_iterator iter_end;
 };

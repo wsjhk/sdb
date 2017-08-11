@@ -69,20 +69,15 @@ private:
 // res => Result<T, E>
 // ft  => std::function<void(T)>
 // fe  => std::function<void(E)>
-#define _VpOrEp(res, ft, fe)\
-    if (res.has_value()) ft(res.get_ok_value());\
-    else fe(res.get_err_value())
+#define _VaOrEr(res, ass)\
+    if (!res.has_value()) return res.get_err();\
+    ass = res.get_ok_value()
 
-#define _VprOrEr(res, ft)\
-    if (res.has_value()) return ft(res.get_ok_value());\
-    else return res.get_err()
-
-#define _VpOrEr(res, ft)\
-    if (res.has_value()) ft(res.get_ok_value());\
-    else return res.get_err()
-
-#define _VaOrEr(ass, fe)\
+#define _VaOrEpr(res, ass, fe)\
     if (!res.has_value()) return fe(res.get_err_value());\
     ass = res.get_ok_value()
+
+#define _IfEEp(res, fe)\
+    if (!res.has_value()) fe(res.get_err_value())
 
 #endif /* ifndef UTIL_RESULT_HPP */

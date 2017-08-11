@@ -14,11 +14,13 @@ class Executor {
 public: 
     Executor(DB *db):db(db){}
     static Result<std::shared_ptr<Executor>, std::string> make(const std::string &db_name);
-    EvilResultList evil(const Ast &ast);
+    EvilResultList execute(const Ast &ast);
 
-    // evil function
-    std::string create_table(const ParserType::nodePtrType &ptr);
-
+    // =========== execute function =========== 
+    // create table
+    Result<void, std::string> create_table(const ParserType::nodePtrType &ptr);
+    Result<SDB::Type::ColProperty, std::string>
+        col_property(const ParserType::nodePtrType &ptr, std::string &primary_key);
 
 private:
     Executor()=delete;

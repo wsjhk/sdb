@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(sdb)
 
 add_compile_options(-std=c++1z)
+# add_compile_options(-fconcepts)
 
 add_subdirectory(src/db)
 add_subdirectory(src/sql)

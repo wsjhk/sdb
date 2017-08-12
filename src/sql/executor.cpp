@@ -43,6 +43,7 @@ Executor::create_table(const nodePtrType &ptr) {
             col_ppt_lst.push_back(col_ppt);
         } else if (col_def->type == "primary_def") {
             // todo
+            return Err<std::string>("multi primary key isn't support now");
         } else if (col_def->type == "foreign_def") {
             // todo
         }
@@ -65,10 +66,10 @@ Executor::col_property(const ParserType::nodePtrType &ptr, std::string &primary_
     size_t type_size = 0;
     if (type_name == "int") {
         col_type = Enum::INT;
-        type_size = 4;
+        type_size = Type::Int::get_type_size();
     } else if (type_name == "smallint") {
         col_type = Enum::SMALLINT;
-        type_size = 2;
+        type_size = Type::SmallInt::get_type_size();
     } else if (type_name == "varchar") {
         col_type = Enum::VARCHAR;
         type_size = std::stoi(children[1]->children[0]->name.c_str());

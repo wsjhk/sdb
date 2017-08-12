@@ -22,21 +22,32 @@ namespace SDB::Type {
 using TypeSizePair = std::pair<Enum::ColType, size_t>;
 
 // ========== db type list ==========
-// int => Number<int32_t>
-// float => Float<float>
-// double => Float<double>
+// TinyInt => Integer<int8_t>
+// SmallInt => Integer<int16_t>
+// Int => Integer<int32_t>
+// BigInt => Integer<int64_t>
+// Varchar => Varchar: public String
 // ==================================
+
+template <typename T>
+constexpr bool isInteger_v = std::is_same_v<int8_t, T>
+                             || std::is_same_v<int16_t, T>
+                             || std::is_same_v<int32_t, T>
+                             || std::is_same_v<int64_t, T>;
 
 // ===== Integer =====
 template <typename T>
+// requires isInteger_v<T>
 class Integer {
+    static_assert(isInteger_v<T>);
 public:
     Integer()=default;
     Integer(T data):data(data){}
 
     // getter
+    constexpr static Enum::ColType get_type_enum();
     std::string get_type_name()const;
-    size_t get_type_size()const{return sizeof(data);};
+    static size_t get_type_size(){return sizeof(T);};
     std::string get_generic_type_name()const{return "Integer";}
     std::string to_string()const;
     Bytes en_bytes()const;
@@ -363,8 +374,19 @@ std::string Integer<T>::get_type_name()const{
         return "int";
     } else if constexpr (std::is_same<T, int64_t>::value){
         return "bigint";
-    } else {
-        return "null";
+    }
+}
+
+template <typename T>
+constexpr Enum::ColType Integer<T>::get_type_enum(){
+    if constexpr (std::is_same<T, int8_t>::value){
+        return Enum::TINYINT;
+    } else if constexpr (std::is_same<T, int8_t>::value){
+        return Enum::SMALLINT;
+    } else if constexpr (std::is_same<T, int32_t>::value){
+        return Enum::INT;
+    } else if constexpr (std::is_same<T, int64_t>::value){
+        return Enum::BIGINT;
     }
 }
 

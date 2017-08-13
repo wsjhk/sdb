@@ -2,4 +2,3 @@
 data/
 .idea/
 .ycm_extra_conf.py
-*test.cpp

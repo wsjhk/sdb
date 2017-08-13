@@ -9,6 +9,7 @@
 #include "cache.h"
 
 using namespace SDB;
+using namespace cpp_util;
 
 // ========== Master =======
 struct DB::Master {

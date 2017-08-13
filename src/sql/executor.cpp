@@ -1,11 +1,12 @@
 #include "executor.h"
 #include "../db/db.h"
-#include "../util/str.hpp"
-#include "../util/log.hpp"
+#include "../cpp_util/str.hpp"
+#include "../cpp_util/log.hpp"
 #include "type.h"
 
 using ParserType::nodePtrType;
 using namespace SDB;
+using namespace cpp_util;
 
 Result<std::shared_ptr<Executor>, std::string> Executor::make(const std::string &db_name){
     auto res = DB::get_db(db_name);
@@ -19,7 +20,7 @@ EvilResultList Executor::execute(const Ast &ast) {
     for (auto &&stm: root->children) {
         if (stm->name == "create_table") {
             auto res = create_table(stm);
-            _IfEEp(res, Log::log);
+            _IfEEp(res, log);
         }
     }
     return res_list;
@@ -38,7 +39,7 @@ Executor::create_table(const nodePtrType &ptr) {
             auto res = col_property(col_def, primary_key);
             _VaOrEr(res, Type::ColProperty col_ppt);
             if (col_name_set.find(col_ppt.col_name) != col_name_set.end()) {
-                return Err<std::string>(Str::format("Error: col_name[%s] specified more than once", col_ppt.col_name));
+                return Err<std::string>(format("Error: col_name[%s] specified more than once", col_ppt.col_name));
             }
             col_ppt_lst.push_back(col_ppt);
         } else if (col_def->type == "primary_def") {
@@ -53,7 +54,7 @@ Executor::create_table(const nodePtrType &ptr) {
     }
     Type::TableProperty table_property(db->get_db_name(), table_name, primary_key, col_ppt_lst);
     db->create_table(table_property);
-    Log::log(Str::format("table [%s] create ok!", table_name));
+    log(format("table [%s] create ok!", table_name));
     return Ok<void>();
 }
 

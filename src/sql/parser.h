@@ -15,13 +15,13 @@
 
 #include "ast.h"
 #include "type.h"
-#include "../util/result.hpp"
+#include "../cpp_util/result.hpp"
 
 class Parser{
 public:
     Parser(const std::string str);
     // === Pasring ===
-    Result<Ast, std::string> parsing();
+    cpp_util::Result<Ast, std::string> parsing();
 
 private:
     ParserType::nodePtrVecType statement_list_processing();

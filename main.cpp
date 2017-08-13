@@ -13,7 +13,7 @@
 #include "src/sql/parser.h"
 #include "src/sql/ast.h"
 #include "src/sql/executor.h"
-#include "src/util/result.hpp"
+#include "src/cpp_util/result.hpp"
 
 using namespace SDB;
 

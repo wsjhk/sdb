@@ -9,8 +9,10 @@
 
 #include "lexer.h"
 #include "ast.h"
-#include "../util/str.hpp"
-#include "../util/log.hpp"
+#include "../cpp_util/str.hpp"
+#include "../cpp_util/log.hpp"
+
+using namespace cpp_util;
 
 #include "parser.h"
 // ========== Type or namespace =========
@@ -111,7 +113,7 @@ nodePtrVecType Parser::create_table_processing(){
     if (token_name == "("){
         error("don't has table name!");
     } else if (get_token_category() != "identifier") {
-        error(Str::format("table name[%s] isn't identifier", token_name));
+        error(format("table name[%s] isn't identifier", token_name));
     }
 
     next_token();
@@ -119,7 +121,7 @@ nodePtrVecType Parser::create_table_processing(){
     ptr_vec.push_back(table_name_node);
 
     if (get_token_name() != "("){
-        error(Str::format("the word[%s] not (", get_token_name()));
+        error(format("the word[%s] not (", get_token_name()));
     }
     next_token();
     auto col_ptr_vec = col_def_list_processing();
@@ -201,12 +203,12 @@ nodePtrVecType Parser::col_def_context_list_processing(){
 
 nodePtrType Parser::col_type_def(){
     if (is_end()) {
-        error(Str::format("column type define errer"));
+        error(format("column type define errer"));
     }
     auto type_name = get_token_name();
     std::unordered_set<std::string> type_set = Lexer::get_type_set();
     if (type_set.find(type_name) == type_set.end()) {
-        error(Str::format("[%s] is not type name", type_name));
+        error(format("[%s] is not type name", type_name));
     }
     nodePtrType node_ptr = std::make_shared<AstNode>(type_name, "type_def", nodePtrVecType());
     next_token();
@@ -446,7 +448,7 @@ void Parser::is_r_to_deep(std::string str){
     static int r_count = 0;
     r_count++;
     if (r_count > 1000){
-        Log::log(str);
+        log(str);
         exit(1);
     }
 }

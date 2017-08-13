@@ -5,7 +5,7 @@
 #include <unordered_set>
 #include <utility>
 #include "table.h"
-#include "../util/result.hpp"
+#include "../cpp_util/result.hpp"
 
 class DB {
 public:
@@ -18,7 +18,7 @@ public:
 public:
     // get_db
     static void create_db(const std::string &db_name);
-    static Result<DB*, std::string> get_db(const std::string &db_name);
+    static cpp_util::Result<DB*, std::string> get_db(const std::string &db_name);
     static bool hasDatabase(const std::string &db_name);
     static void drop_db(const std::string &db_name);
     std::string get_db_name()const {

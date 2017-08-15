@@ -5,51 +5,37 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-#include <stdexcept>
 #include <vector>
-#include <memory>
-#include <cstring>
 #include <string>
 #include <iostream>
 #include <map>
+#include <set>
 #include <list>
 #include <unordered_map>
 #include <unordered_set>
 #include <boost/spirit/home/support/container.hpp>
 
 namespace SDB {
-
-namespace Enum {
-    enum BVFunc: char {
-        EQ,
-        LESS,
-        GREATER,
-    };
-} // Enum namespace
-
 namespace Const {
     #include <unistd.h>
-    const size_t BLOCK_SIZE = size_t(getpagesize());
-    const size_t SIZE_SIZE = sizeof(size_t);
-    const size_t INT_SIZE = sizeof(int32_t);
-    const size_t FLOAT_SIZE = sizeof(float);
-    const size_t POS_SIZE = sizeof(size_t);
-
-    const size_t CACHE_COUNT = 100;
+    static const size_t BLOCK_SIZE = size_t(getpagesize());
+    static const size_t SIZE_SIZE = sizeof(size_t);
+    static const size_t INT_SIZE = sizeof(int32_t);
+    static const size_t FLOAT_SIZE = sizeof(float);
+    static const size_t POS_SIZE = sizeof(size_t);
 } // Const namespace
 
 namespace Type {
     // - Pos -
     using Pos = size_t;
-    using PosList = std::vector<Pos>;
 
-    //
+    // bytes
     using Byte = char;
     using Bytes = std::vector<Byte>;
-    using BytesList = std::vector<Bytes>;
 } // Type namespace
 
 namespace Traits {
+    // pair
     template <typename T>
     struct PairTraits {
         static const bool value = false;
@@ -58,194 +44,161 @@ namespace Traits {
     struct PairTraits<std::pair<Fst, Sec>> {
         static const bool value = true;
     };
-    // vector
-    template <typename T>
-    struct VectorTraits {
-        static const bool value = false;
-    };
-    template <typename SubType>
-    struct VectorTraits<std::vector<SubType>> {
-        static const bool value = true;
-    };
-    // list
-    template <typename SubType>
-    struct ListTraits {
-        static const bool value = false;
-    };
-    template <typename SubType>
-    struct ListTraits<std::list<SubType>> {
-        static const bool value = true;
-    };
-    // string
-    template <typename SubType>
-    struct StringTraits {
-        static const bool value = false;
-    };
-    template <>
-    struct StringTraits<std::string> {
-        static const bool value = true;
-    };
-    // set
-    template <typename SubType>
-    struct USetTraits {
-        static const bool value = false;
-    };
-    template <typename SubType>
-    struct USetTraits<std::unordered_set<SubType>> {
-        static const bool value = true;
-    };
-    // map
-    template <typename T>
-    struct MapTraits {
-        static const bool value = false;
-    };
-    template <typename Fst, typename Sec>
-    struct MapTraits<std::map<Fst, Sec>> {
-        static const bool value = true;
-    };
+
     // unordered_map
     template <typename T>
     struct UMapTraits {
         static const bool value = false;
     };
-    template <typename Fst, typename Sec>
-    struct UMapTraits<std::unordered_map<Fst, Sec>> {
+    template <typename Fst, typename Snd>
+    struct UMapTraits<std::unordered_map<Fst, Snd>> {
         static const bool value = true;
     };
 
+    // map
+    template <typename T>
+    struct MapTraits {
+        static const bool value = false;
+    };
+    template <typename Fst, typename Snd>
+    struct MapTraits<std::map<Fst, Snd>> {
+        static const bool value = true;
+    };
+
+    // unordered_set
+    template <typename T>
+    struct USetTraits {
+        static const bool value = false;
+    };
+    template <typename T>
+    struct USetTraits<std::unordered_set<T>> {
+        static const bool value = true;
+    };
+
+    // set
+    template <typename T>
+    struct SetTraits {
+        static const bool value = false;
+    };
+    template <typename T>
+    struct SetTraits<std::set<T>> {
+        static const bool value = true;
+    };
+
+    // always_false
+    template <typename T>
+    struct always_false : std::false_type{};
+
     template<typename T>
-    constexpr bool is_set = USetTraits<T>::value;
+    constexpr bool is_set_v = SetTraits<T>::value || USetTraits<T>::value;
+
     template<typename T>
-    constexpr bool is_map = UMapTraits<T>::value || MapTraits<T>::value;
+    constexpr bool is_map_v = MapTraits<T>::value || UMapTraits<T>::value;
+
 } // SDB::Taits namespace
 
 namespace Function {
     // en_bytes if basic type
     using boost::spirit::traits::is_container;
+    using Type::Bytes;
+
     template <typename T>
-    inline typename std::enable_if<
-            !is_container<T>::value && !Traits::PairTraits<T>::value,
-            Type::Bytes>::type
-    en_bytes(T t){
-        SDB::Type::Bytes bytes = std::vector<char>(sizeof(t));
-        std::memcpy(bytes.data(), &t, sizeof(t));
-        return bytes;
-    }
-    //
-    template <typename Fst, typename Sec>
-    inline Type::Bytes en_bytes(std::pair<Fst, Sec> pair);
-    // en_bytes if 'set' type
-    template <typename Ctn>
-    inline typename std::enable_if<
-            is_container<Ctn>::value && !std::is_same<Ctn, Type::Bytes>::value,
-            Type::Bytes>::type
-    en_bytes(Ctn cnt){
-        Type::Bytes bytes;
-        Type::Bytes size_bytes = en_bytes(cnt.size());
-        bytes.insert(bytes.end(), size_bytes.begin(), size_bytes.end());
-        for (auto &&x : cnt) {
-            Type::Bytes x_bytes = en_bytes(x);
-            bytes.insert(bytes.end(), x_bytes.begin(), x_bytes.end());
+    inline Bytes en_bytes(T t) {
+        Bytes bytes;
+        if constexpr (std::is_same_v<std::remove_reference_t<T>, std::string>) {
+            Bytes size_bytes = en_bytes(t.size());
+            bytes.insert(bytes.end(), size_bytes.begin(), size_bytes.end());
+            bytes.insert(bytes.end(), t.begin(), t.end());
+        } else if constexpr (is_container<T>::value) {
+            Bytes size_bytes = en_bytes(t.size());
+            bytes.insert(bytes.end(), size_bytes.begin(), size_bytes.end());
+            for (auto &&x : t) {
+                Bytes x_bytes = en_bytes(x);
+                bytes.insert(bytes.end(), x_bytes.begin(), x_bytes.end());
+            }
+        } else if constexpr (Traits::PairTraits<T>::value) {
+            Bytes fst_bytes = en_bytes(t.first);
+            Bytes snd_bytes = en_bytes(t.second);
+            bytes.insert(bytes.end(), fst_bytes.begin(), fst_bytes.end());
+            bytes.insert(bytes.end(), snd_bytes.begin(), snd_bytes.end());
+        } else if constexpr (std::is_fundamental_v<T>) {
+            Bytes t_b(sizeof(t));
+            std::memcpy(t_b.data(), &t, sizeof(t));
+            bytes.insert(bytes.end(), t_b.begin(), t_b.end());
+        } else {
+            static_assert(Traits::always_false<T>::value);
         }
         return bytes;
     }
-    // en_bytes if pair type
-    template <typename Fst, typename Sec>
-    inline Type::Bytes en_bytes(std::pair<Fst, Sec> pair){
-        Type::Bytes bytes;
-        Type::Bytes fst_bytes = en_bytes(pair.first);
-        Type::Bytes sec_bytes = en_bytes(pair.second);
-        bytes.insert(bytes.end(), fst_bytes.begin(), fst_bytes.end());
-        bytes.insert(bytes.end(), sec_bytes.begin(), sec_bytes.end());
+
+    template <typename T, typename ...Args>
+    inline Bytes en_bytes(T &&t, Args... args) {
+        Bytes bytes = en_bytes(t);
+        Bytes append_bytes = en_bytes(args...);
+        bytes.insert(bytes.end(), append_bytes.begin(), append_bytes.end());
         return bytes;
     }
 
-    template <typename T>
-    inline typename std::enable_if<Traits::UMapTraits<T>::value || Traits::USetTraits<T>::value, void>::type
-    container_append(T &t, typename T::value_type tail) {
-        t.insert(tail);
-    }
-    template <typename T>
-    inline typename std::enable_if<Traits::VectorTraits<T>::value 
-                                   || Traits::ListTraits<T>::value
-                                   || Traits::StringTraits<T>::value, void>::type
-    container_append(T &t, typename T::value_type tail) {
-        t.push_back(tail);
+    // === de_bytes ===
+    inline void _bytes_length_check(size_t size, const Bytes &bytes, size_t offset){
+        assert(size <= bytes.size() - offset);
     }
 
-    //  === en_bytes ===
-    //  en_bytes if type is base type
     template <typename T>
-    inline typename std::enable_if<
-            !is_container<T>::value && !Traits::PairTraits<T>::value,
-            void>::type
-    de_bytes(T &t, const Type::Bytes &bytes, size_t &offset){
-        std::memcpy(&t, bytes.data()+offset, sizeof(t));
-        offset += sizeof(t);
-    }
-    //  en_bytes if type is base type
-    template <typename T>
-    inline typename std::enable_if<
-            !is_container<T>::value && !Traits::PairTraits<T>::value,
-            void>::type
-    de_bytes(T &t, const Type::Bytes &bytes){
-        std::memcpy(&t, bytes.data(), sizeof(t));
-    }
-
-    // en_bytes if type is std::pair<> [forward define]
-    template <typename Fst, typename Sec>
-    inline void db_bytes(std::pair<Fst, Sec> &value, const Type::Bytes &bytes, size_t &offset);
-
-    // en_bytes if type is container but map
-    template <typename T>
-    inline typename std::enable_if<is_container<T>::value && !Traits::is_map<T>, void>::type
-    de_bytes(T &t, const Type::Bytes &bytes, size_t &offset) {
-        size_t len;
-        std::memcpy(&len, bytes.data()+offset, Const::SIZE_SIZE);
-        offset += Const::SIZE_SIZE;
-        for (size_t i = 0; i < len; i++) {
-            typename T::value_type value;
-            de_bytes(value, bytes, offset);
-            container_append(t, value);
-        }
-    }
-    // en_bytes if type is std::map or std::unordered_map
-    template <typename T>
-    inline typename std::enable_if<Traits::is_map<T>, void>::type
-    de_bytes(T &t, const Type::Bytes &bytes, size_t &offset) {
-        size_t len;
-        std::memcpy(&len, bytes.data()+offset, Const::SIZE_SIZE);
-        offset += Const::SIZE_SIZE;
-        for (size_t i = 0; i < len; i++) {
-            std::remove_const_t<typename T::value_type> value;
-            std::remove_const_t<decltype(value.first)> fst_value;
-            std::remove_const_t<decltype(value.second)> sec_value;
-            de_bytes(fst_value, bytes, offset);
-            de_bytes(sec_value, bytes, offset);
-            t.insert(std::make_pair(fst_value, sec_value));
+    inline void container_append(T &t, typename T::value_type tail) {
+        if constexpr(!is_container<T>::value) {
+        } else if constexpr (Traits::is_set_v<T> || Traits::is_map_v<T>) {
+            t.insert(tail);
+        } else {
+            t.push_back(tail);
         }
     }
 
-    // en_bytes if type is std::pair<>
-    template <typename Fst, typename Sec>
-    inline void de_bytes(std::pair<Fst, Sec> &value, const Type::Bytes &bytes, size_t &offset) {
-        de_bytes(value.first, bytes, offset);
-        de_bytes(value.second, bytes, offset);
-    };
-
-
-    inline void bytes_print(const SDB::Type::Bytes &bytes) {
-        for (auto &&item : bytes) {
-            std::cout << item;
-        }
-        std::cout << std::endl;
-    }
-
     template <typename T>
-    inline void bytes_append(Type::Bytes &bytes, T &&tail) {
-        Type::Bytes tail_bytes = en_bytes(tail);
-        bytes.insert(bytes.end(), tail_bytes.begin(), tail_bytes.end());
+    inline void de_bytes(T &t, const Bytes &bytes, size_t &offset) {
+        if constexpr (std::is_fundamental_v<T>) {
+            _bytes_length_check(sizeof(T), bytes, offset);
+            std::memcpy(&t, bytes.data() + offset, sizeof(T));
+            offset += sizeof(T);
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            _bytes_length_check(sizeof(size_t), bytes, offset);
+            size_t size;
+            de_bytes(size, bytes, offset);
+            assert(size <= bytes.size() - offset);
+            t.resize(size, '\0');
+            std::memcpy(t.data(), bytes.data()+offset, size);
+            offset += size;
+        } else if constexpr (Traits::PairTraits<T>::value) {
+            // for std::pair<const F, S> in map and set
+            std::remove_const_t<decltype(t.first)> fst;
+            de_bytes(fst, bytes, offset);
+            decltype(t.first) fst_copy = fst;
+            decltype(t.second) snd;
+            de_bytes(snd, bytes, offset);
+            t = {fst_copy, snd};
+        } else if constexpr (is_container<T>::value) {
+            _bytes_length_check(sizeof(size_t), bytes, offset);
+            size_t size;
+            de_bytes(size, bytes, offset);
+            t.clear();
+            for (size_t i = 0; i < size; i++) {
+                if constexpr (Traits::is_map_v<T>) {
+                    std::remove_const_t<typename T::value_type::first_type> fst;
+                    typename T::value_type::second_type snd;
+                    de_bytes(fst, bytes, offset);
+                    de_bytes(snd, bytes, offset);
+                    container_append(t, std::make_pair(fst, snd));
+                } else {
+                    typename T::value_type val;
+                    de_bytes(val, bytes, offset);
+                    container_append(t, val);
+                }
+            }
+        } else {
+            static_assert(Traits::always_false<T>::value);
+        }
     }
+
 } // SDB::Function namespace
 
 } // SDB namespace

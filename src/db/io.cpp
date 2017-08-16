@@ -13,58 +13,83 @@
 
 #include "io.h"
 #include "util.h"
+#include "../cpp_util/log.hpp"
 
 using std::ios;
 using SDB::Const::BLOCK_SIZE;
 using SDB::Type::Bytes;
 namespace ef = std::experimental::filesystem;
 
+using namespace cpp_util;
+
 // ========= public =========
-void IO::create_file(const std::string &file_name) {
-    std::string file_path = get_db_file_path(file_name);
-    std::ifstream in(file_path);
-    if (in.is_open()) {
-        throw std::runtime_error(
-            std::string("Error:filename[")+file_name+"] already existed\n"
-       );
+// dir
+void IO::create_dir(const std::string &dir_path) {
+    std::string abs_path = get_db_file_path(dir_path);
+    bool sc = ef::create_directory(abs_path);
+}
+
+void IO::remove_dir_force(const std::string &dir_path) {
+    try {
+        ef::remove_all(get_db_file_dir_path()+"/"+dir_path);
+    } catch (ef::filesystem_error err) {
+        assert_msg(false, err.what());
     }
-    std::ofstream out(file_path, ios::binary);
+}
+
+// file
+void IO::create_file(const std::string &file_path) {
+    std::string abs_path = get_db_file_path(file_path);
+    // todo: multi-thread
+    // unsafe
+    assert_msg(!has_file(file_path), abs_path);
+    std::ofstream out(abs_path, ios::binary | ios::app);
     out.close();
 }
 
 void IO::delete_file(const std::string &file_name) {
-    bool bl = ef::remove(get_db_file_path(file_name));
+    // todo: multi-thread
+    // unsafe 
+    assert_msg(has_file(file_name), file_name);
+    try {
+        ef::remove(get_db_file_path(file_name));
+    } catch (ef::filesystem_error err) {
+        assert_msg(false, err.what());
+    }
 }
 
-void IO::write_block(const SDB::Type::Bytes &data, size_t block_num){
-    if (data.size() != BLOCK_SIZE) {
-        throw std::runtime_error("Error: data size not equal BLOCK_SIZE");
-    }
-    int fd = open(file_path.data(), O_RDWR);
-    if (fd < 0) {
-        throw std::runtime_error(
-            std::string("Error: open file error:")+file_path
-        );
-    }
-    if (get_file_size() < (block_num+1)*BLOCK_SIZE) {
-        lseek(fd, BLOCK_SIZE*(1+block_num), SEEK_SET);
-        write(fd, "", 1);
-    }
-    char *buff = (char*)mmap(nullptr, BLOCK_SIZE, PROT_WRITE, MAP_SHARED, fd, BLOCK_SIZE*block_num);
-    std::memcpy(buff, data.data(), BLOCK_SIZE);
-    close(fd);
-    munmap(buff, BLOCK_SIZE);
+SDB::Type::Bytes IO::read_file(const std::string &file_path) {
+    std::string abs_path = get_db_file_path(file_path);
+    std::ifstream in(abs_path, std::ios::binary);
+    assert_msg(in.is_open(), abs_path);
+    size_t file_size = get_file_size(file_path);
+    Bytes buffer_data(file_size);
+    in.read(buffer_data.data(), file_size);
+    return buffer_data;
 }
 
-SDB::Type::Bytes IO::read_block(size_t block_num) {
+void IO::full_write_file(const std::string &file_path, const SDB::Type::Bytes &data) {
+    std::string abs_path = get_db_file_path(file_path);
+    assert_msg(has_file(file_path), abs_path);
+    std::ofstream out(abs_path, ios::binary);
+    out.write(data.data(), data.size());
+    out.close();
+}
+
+void IO::append_write_file(const std::string &file_path, const SDB::Type::Bytes &data) {
+    std::string abs_path = get_db_file_path(file_path);
+    assert_msg(has_file(file_path), abs_path);
+    std::ofstream out(abs_path, ios::binary | ios::app);
+    out.write(data.data(), data.size());
+    out.close();
+}
+
+SDB::Type::Bytes IO::read_block(const std::string &file_path, size_t block_num) {
     // mmap read
-    int fd = open(file_path.data(), O_RDWR);
-    if (fd < 0) {
-        throw std::runtime_error(
-            std::string("Error: open file error:")+file_path
-        );
-    }
-    if (get_file_size() < (block_num+1)*BLOCK_SIZE) {
+    std::string abs_path = get_db_file_path(file_path);
+    int fd = open(abs_path.data(), O_RDWR);
+    assert_msg(fd <0, abs_path);
+    if (get_file_size(file_path) < (block_num+1)*BLOCK_SIZE) {
         lseek(fd, BLOCK_SIZE*(block_num+1), SEEK_SET);
         write(fd, "", 1);
     }
@@ -76,53 +101,32 @@ SDB::Type::Bytes IO::read_block(size_t block_num) {
     return bytes;
 }
 
-SDB::Type::Bytes IO::read_file() {
-    std::ifstream in(file_path, std::ios::binary);
-    if (!in.is_open()) {
-        throw std::runtime_error(
-                std::string("Error: read file [")+file_path+"] error!"
-        );
+void IO::write_block(const std::string &file_path, const SDB::Type::Bytes &data, size_t block_num){
+    std::string abs_path = get_db_file_path(file_path);
+    if (data.size() != BLOCK_SIZE) {
+        throw std::runtime_error("Error: data size not equal BLOCK_SIZE");
     }
-    size_t file_size = get_file_size();
-    Bytes buffer_data(file_size);
-    in.read(buffer_data.data(), file_size);
-    return buffer_data;
+    int fd = open(abs_path.data(), O_RDWR);
+    assert_msg(fd < 0, abs_path);
+    if (get_file_size(file_path) < (block_num+1)*BLOCK_SIZE) {
+        lseek(fd, BLOCK_SIZE*(1+block_num), SEEK_SET);
+        write(fd, "", 1);
+    }
+    char *buff = (char*)mmap(nullptr, BLOCK_SIZE, PROT_WRITE, MAP_SHARED, fd, BLOCK_SIZE*block_num);
+    std::memcpy(buff, data.data(), BLOCK_SIZE);
+    close(fd);
+    munmap(buff, BLOCK_SIZE);
 }
 
-void IO::write_file(const SDB::Type::Bytes &data) {
-    std::ofstream out(file_path, std::ios::binary);
-    if (!out.is_open()) {
-        throw std::runtime_error(
-                std::string("Error: write file [")+file_path+"] error!"
-        );
-    }
-    out.write(data.data(), data.size());
-    out.close();
+bool IO::has_file(const std::string &str) {
+    return ef::exists(get_db_file_path(str));
 }
 
-bool IO::hasFile(const std::string &str) {
-    std::ifstream in(str);
-    if (in.is_open()){
-        return true;
-    }
-    return false;
-}
-
-size_t IO::get_file_size() const {
+size_t IO::get_file_size(const std::string &file_path) {
+    std::string abs_path = get_db_file_path(file_path);
     struct stat file_info;
-    stat(file_path.data(), &file_info);
+    stat(abs_path.data(), &file_info);
     return (size_t)(file_info.st_size);
-}
-
-std::vector<std::string> IO::get_db_name_list() {
-    std::vector<std::string> ret;
-    ef::path db_path(get_db_file_dir_path());
-    ef::directory_iterator it(db_path);
-    ef::directory_iterator end_it;
-    for (; it != end_it; it++) {
-        ret.push_back(it->path().filename());
-    }
-    return ret;
 }
 
 std::string IO::get_db_file_dir_path() {
@@ -132,19 +136,6 @@ std::string IO::get_db_file_dir_path() {
 }
 
 std::string IO::get_db_file_path(const std::string &file_name) {
-    using namespace SDB::Enum;
     std::string file_path = get_db_file_dir_path();
     return file_path + '/' + file_name;
-}
-
-void IO::create_dir(const std::string &dir_path) {
-    ef::create_directories(get_db_file_dir_path()+"/"+dir_path);
-}
-
-void IO::remove_dir(const std::string &dir_path) {
-    ef::remove(get_db_file_dir_path()+"/"+dir_path);
-}
-
-void IO::remove_dir_force(const std::string &dir_path) {
-    ef::remove_all(get_db_file_dir_path()+"/"+dir_path);
 }

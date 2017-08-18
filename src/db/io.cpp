@@ -27,6 +27,7 @@ using namespace cpp_util;
 void IO::create_dir(const std::string &dir_path) {
     std::string abs_path = get_db_file_path(dir_path);
     bool sc = ef::create_directory(abs_path);
+    assert_msg(sc, format("Error: file %s already existed", abs_path));
 }
 
 void IO::remove_dir_force(const std::string &dir_path) {
@@ -88,7 +89,7 @@ SDB::Type::Bytes IO::read_block(const std::string &file_path, size_t block_num) 
     // mmap read
     std::string abs_path = get_db_file_path(file_path);
     int fd = open(abs_path.data(), O_RDWR);
-    assert_msg(fd <0, abs_path);
+    assert_msg(fd >= 0, abs_path);
     if (get_file_size(file_path) < (block_num+1)*BLOCK_SIZE) {
         lseek(fd, BLOCK_SIZE*(block_num+1), SEEK_SET);
         write(fd, "", 1);
@@ -101,13 +102,13 @@ SDB::Type::Bytes IO::read_block(const std::string &file_path, size_t block_num) 
     return bytes;
 }
 
-void IO::write_block(const std::string &file_path, const SDB::Type::Bytes &data, size_t block_num){
+void IO::write_block(const std::string &file_path, size_t block_num, const SDB::Type::Bytes &data){
     std::string abs_path = get_db_file_path(file_path);
     if (data.size() != BLOCK_SIZE) {
         throw std::runtime_error("Error: data size not equal BLOCK_SIZE");
     }
     int fd = open(abs_path.data(), O_RDWR);
-    assert_msg(fd < 0, abs_path);
+    assert_msg(fd >= 0, abs_path);
     if (get_file_size(file_path) < (block_num+1)*BLOCK_SIZE) {
         lseek(fd, BLOCK_SIZE*(1+block_num), SEEK_SET);
         write(fd, "", 1);

@@ -3,160 +3,92 @@
 #include "cache.h"
 #include "util.h"
 #include "io.h"
+#include "../cpp_util/log.hpp"
 
 using namespace SDB;
+using namespace cpp_util;
 
 // ========== public function ==========
-Cache::Bytes Cache::get(const std::string &path, size_t block_num) {
+BlockCache::Bytes BlockCache::get(const std::string &path, size_t block_num) {
+    mutex.lock();
     CacheKey key = encode_key(path, block_num);
-    auto it = data.find(key);
-    if (it == data.end()) {
-        return Bytes();
-    }
-    auto count_iter = it->second.count_iter;
-    auto key_iter = it->second.key_iter;
-    auto lst_it_next = std::next(count_iter);
-    if (lst_it_next != count_lst.end() && count_iter->first == lst_it_next->first-1) {
-        lst_it_next->second.push_front(key);
-        it->second.count_iter = std::next(count_iter);
-        it->second.key_iter = lst_it_next->second.begin();
-        count_iter->second.erase(key_iter);
-        if (count_iter->second.empty()) {
-            count_lst.erase(count_iter);
+    auto it = key_map.find(key);
+    if (it == key_map.end()) {
+        Bytes bytes = read_block(path, block_num);
+        if (value_list.size() >= max_block_count) {
+            pop();
         }
-    } else {
-        KeyLst key_lst{key};
-        count_lst.insert(lst_it_next, make_pair(count_iter->first+1, key_lst));
-        it->second.count_iter = std::next(count_iter);
-        it->second.key_iter = std::next(count_iter)->second.begin();
-        count_iter->second.erase(key_iter);
-        if (count_iter->second.empty()) {
-            count_lst.erase(count_iter);
-        }
+        value_list.push_front(CacheValue(key, std::make_shared<Bytes>(bytes)));
+        key_map[key] = value_list.begin();
+        mutex.unlock();
+        return bytes;
     }
-    return *it->second.ptr;
+    BytesPtr ptr = it->second->ptr;
+    Bytes bytes = *ptr;
+    value_list.erase(it->second);
+    value_list.push_front(CacheValue(key, ptr));
+    it->second = value_list.begin();
+    mutex.unlock();
+    return bytes;
 }
 
-void Cache::put(const std::string &path, size_t block_num, const Bytes &bytes) {
+void BlockCache::put(const std::string &path, size_t block_num, const Bytes &bytes) {
+    mutex.lock();
+    CacheKey key = encode_key(path, block_num);
     BytesPtr ptr = std::make_shared<Bytes>(bytes);
-    CacheKey key = encode_key(path, block_num);
-    auto it = data.find(key);
-    if (it != data.end()) {
-        get(path, block_num);
-        it->second.ptr = ptr;
+    auto it = key_map.find(key);
+    if (it == key_map.end()) {
+        value_list.push_front(CacheValue(key, ptr));
+        key_map[key] = value_list.begin();
+        mutex.unlock();
         return;
-    } else if (data.size() >= Const::CACHE_COUNT) {
-        auto fst = count_lst.begin();
-        CacheKey erase_key = fst->second.back();
-        // write back file
-        auto key_pair = decode_key(erase_key);
-        write_back(key_pair.first, key_pair.second, *data.at(erase_key).ptr);
-        // delete erase_key
-        data.erase(erase_key);
-        fst->second.pop_back();
-        if (fst->second.empty()){
-            count_lst.erase(count_lst.begin());
-        }
     }
-    KeyLst::iterator int_it;
-    if (!count_lst.empty() && count_lst.begin()->first == 0) {
-        count_lst.begin()->second.push_front(key);
-    } else {
-        KeyLst key_lst{key};
-        count_lst.push_front(make_pair(0, key_lst));
-    }
-    data[key] = CacheValue(ptr, count_lst.begin(), count_lst.begin()->second.begin());
+    value_list.erase(it->second);
+    value_list.push_front(CacheValue(key, ptr));
+    it->second = value_list.begin();
+    mutex.unlock();
 }
 
-// pop a cache value
-auto Cache::pop(const std::string &path, size_t block_num){
-    auto key = encode_key(path, block_num);
-    auto data_it = data.find(key);
-    if (data_it == data.end()){
-        return data.end();
-    }
-    auto count_lst_it = data_it->second.count_iter;
-    count_lst_it->second.erase(data_it->second.key_iter);
-    if (count_lst_it->second.empty()){
-        count_lst.erase(count_lst_it);
-    }
-    return data.erase(data_it);
-}
-
-// pop a file cache
-void Cache::pop_file(const std::string &path){
-    for (auto it = data.begin(); it != data.end();it++) {
-        auto pair = decode_key(it->first);
-        if (pair.first == path) {
-            it = pop(pair.first, pair.second);
-            if (it == data.end()){
-                break;
-            }
-            continue;
-        }
-    }
-}
-
-Cache::Bytes Cache::read_block(const std::string &path, size_t block_num) {
+BlockCache::Bytes BlockCache::read_block(const std::string &path, size_t block_num) {
     // read cache
-    Bytes cache_bytes = get(path, block_num);
-    if (!cache_bytes.empty()) {
-        return cache_bytes;
-    }
-    // else read file
-    IO io(path);
-    cache_bytes = io.read_block(block_num);
-    // put data to cache
-    put(path, block_num, cache_bytes);
+    IO &io = IO::get();
+    Bytes cache_bytes = io.read_block(path, block_num);
     return cache_bytes;
-}
-
-void Cache::write_block(const std::string &path, size_t block_num, const Bytes &bytes) {
-    put(path, block_num, bytes);
-}
-
-Type::Bytes Cache::read_file(const std::string &path){
-    // read cache
-    Bytes cache_bytes = get(path, 0);
-    if (!cache_bytes.empty()) {
-        return cache_bytes;
-    }
-    // else read file
-    IO io(path);
-    cache_bytes = io.read_file();
-    // put data to cache
-    put(path, 0, cache_bytes);
-    return cache_bytes;
-}
-
-void Cache::write_file(const std::string &path, const Bytes &bytes){
-    put(path, 0, bytes);
 }
 
 // ========== private function ==========
-Cache::CacheKey Cache::encode_key(const std::string &path, size_t block_num) {
+BlockCache::CacheKey BlockCache::encode_key(const std::string &path, size_t block_num) {
     return path+"+"+std::to_string(block_num);
 }
 
-Cache::KeyPair Cache::decode_key(const std::string &key) {
+BlockCache::KeyPair BlockCache::decode_key(const std::string &key) {
     size_t iter = key.find('+');
     std::string filename(key, 0, iter);
     size_t block_num = std::stoul(std::string(key, iter+1, key.size()));
     return std::make_pair(filename, block_num);
 }
 
-void Cache::write_back(const std::string &path, size_t block_num, const Bytes &bytes) {
-    IO io(path);
-    if (bytes.size() == Const::BLOCK_SIZE) {
-        io.write_block(bytes, block_num);
-    } else {
-        io.write_file(bytes);
+void BlockCache::sync() {
+    mutex.lock();
+    for (auto &&[key, vl_it] : key_map) {
+        auto &&[path, block_num] = decode_key(key);
+        IO::get().write_block(path, block_num, *vl_it->ptr);
     }
+    mutex.unlock();
 }
 
-void Cache::sync() {
-    for (auto &&item : data) {
-        auto pair = decode_key(item.first);
-        write_back(pair.first, pair.second, *item.second.ptr);
-    }
+auto BlockCache::sync(const std::string &path, size_t block_num) {
+    mutex.lock();
+    auto it = key_map.find(encode_key(path, block_num));
+    IO::get().write_block(path, block_num, *it->second->ptr);
+    mutex.unlock();
+}
+
+void BlockCache::pop() {
+    auto &&[key, ptr] = value_list.back();
+    auto &&[path, block_num] = decode_key(key);
+    auto it = key_map.find(key);
+    IO::get().write_block(path, block_num, *it->second->ptr);
+    key_map.erase(key);
+    value_list.pop_back();
 }

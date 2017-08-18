@@ -33,7 +33,7 @@ public:
 
     // block
     Bytes read_block(const std::string &file_path, size_t block_num);
-    void write_block(const std::string &file_path, const SDB::Type::Bytes &data, size_t block_num);
+    void write_block(const std::string &file_path, size_t block_num, const SDB::Type::Bytes &data);
 
     // get
     bool has_file(const std::string &str);

@@ -76,11 +76,18 @@ private:
 private:
     // max cache block
     size_t max_block_count;
-    // count read/write block frequency
+    // full mutex
     std::mutex mutex;
+    // block cache data list
     ValueList value_list;
-    // block cache data
     std::unordered_map<CacheKey, ValueList::iterator> key_map;
+};
+
+class CacheMaster {
+    BlockCache &get_misc_cache() {
+        static BlockCache cache(100);
+        return cache;
+    }
 };
 
 #endif //CACHE_H

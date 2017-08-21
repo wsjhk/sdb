@@ -7,7 +7,7 @@ using SDB::Type::Bytes;
 using SDB::Function::en_bytes;
 using SDB::Function::de_bytes;
 
-TEST(db_io_test, dir) {
+TEST(db_io_test, io) {
     IO &io = IO::get();
     // create first
     if (io.has_file("_test")) {

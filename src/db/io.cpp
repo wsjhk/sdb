@@ -13,6 +13,7 @@
 
 #include "io.h"
 #include "util.h"
+#include "../cpp_util/error.hpp"
 #include "../cpp_util/log.hpp"
 
 using std::ios;

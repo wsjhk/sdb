@@ -19,8 +19,6 @@ namespace SDB::Enum {
 
 namespace SDB::Type {
 
-using TypeSizePair = std::pair<Enum::ColType, size_t>;
-
 // ========== db type list ==========
 // TinyInt => Integer<int8_t>
 // SmallInt => Integer<int16_t>

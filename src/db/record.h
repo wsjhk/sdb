@@ -12,7 +12,6 @@ class Record {
 public:
     // type
     using Pos = SDB::Type::Pos ;
-    using PosList = SDB::Type::PosList;
     using Byte = SDB::Type::Byte;
     using Bytes = SDB::Type::Bytes;
     using Value = SDB::Type::Value;

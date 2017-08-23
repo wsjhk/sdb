@@ -5,7 +5,7 @@
 using namespace SDB::DBType;
 
 TEST(db_db_type_test, integer_object) {
-    UP<Object> obj = std::make_unique<Int>(10);
+    SP<Object> obj = std::make_unique<Int>(10);
     // type
     ASSERT_TRUE(obj->get_type_name() == "int");
     ASSERT_TRUE(obj->get_type_tag() == INT);
@@ -20,11 +20,24 @@ TEST(db_db_type_test, integer_object) {
     obj->de_bytes(bytes, offset);
     ASSERT_TRUE(obj->en_bytes() == bytes);
 
-    UP<Object> int_obj = std::make_unique<Int>(10);
-    UP<Object> uint_obj = std::make_unique<Int>(10);
+    SP<Object> int_obj = std::make_unique<Int>(10);
+    SP<Object> int_min_obj = std::make_unique<Int>(0);
+    SP<Object> uint_obj = std::make_unique<UInt>(10);
 
     // operator
-    ASSERT_TRUE(!obj->less(int_obj).get_ok_value());
-    ASSERT_TRUE(obj->eq(int_obj).get_ok_value());
+    // less
+    ASSERT_TRUE(!obj->less(int_obj));
+    ASSERT_TRUE(!obj->less(int_min_obj));
+    ASSERT_TRUE(int_min_obj->less(obj));
+    ASSERT_TRUE(!int_obj->less(obj));
+
+    // eq
+    ASSERT_TRUE(obj->eq(int_obj));
+    try {
+        obj->eq(uint_obj);
+        ASSERT_TRUE(false);
+    } catch (DBTypeMismatchingError err) {}
+
+    // add sub mul div
 }
 

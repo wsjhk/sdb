@@ -16,8 +16,11 @@ namespace SDB::DBType {
 using Bytes = Type::Bytes;
 template <typename T>
 using SP = std::shared_ptr<T>;
-template <typename T>
-using UP = std::shared_ptr<T>;
+
+template <typename T, typename U>
+inline std::shared_ptr<T> dfc(U &&u) {
+    return std::dynamic_pointer_cast<T>(std::forward<U>(u));
+}
 
 using namespace cpp_util;
 
@@ -29,17 +32,24 @@ enum TypeTag : char {
     VARCHAR
 };
 
-struct TypeError {
-    enum TypeErrorTag {
-        OVER_FLOW,
-        NOT_MATCHING,
-        DIV_ZERO,
-    };
+struct DBTypeError : public std::runtime_error {
+    DBTypeError(const std::string &str)
+        :runtime_error(str){}
+};
 
-    TypeError(TypeErrorTag tag, std::string desc):tag(tag), desc(desc){}
+struct DBTypeOverflowError : public DBTypeError {
+    DBTypeOverflowError(const std::string &str)
+        :DBTypeError(str){}
+};
 
-    TypeErrorTag tag;
-    std::string desc;
+struct DBTypeMismatchingError : public DBTypeError {
+    DBTypeMismatchingError(const std::string &lv, const std::string &rv, const std::string &op)
+        :DBTypeError(format("TypeError: %s %s %s isn't matching", lv, op, rv)){}
+};
+
+struct DBTypeDivzeroError : public DBTypeError {
+    DBTypeDivzeroError()
+        :DBTypeError(format("TypeError: div By 0")){}
 };
 
 // ========== Object ==========
@@ -58,13 +68,8 @@ public:
     virtual void de_bytes(const Type::Bytes &bytes, size_t &offset)=0;
 
     // operator
-    virtual Result<bool, TypeError> less(SP<const Object> obj)const =0;
-    virtual Result<bool, TypeError> eq(SP<const Object> obj)const =0;
-
-    Err<TypeError> ret_mismatching(SP<const Object> r)const{
-        auto msg = format("TypeError: %s < %s isn't matching", get_type_name(), r->get_type_name());
-        return Err<TypeError>(TypeError(TypeError::NOT_MATCHING, msg));
-    }
+    virtual bool less(SP<const Object> obj)const =0;
+    virtual bool eq(SP<const Object> obj)const =0;
 };
 
 // ===== Integer =====
@@ -83,6 +88,9 @@ public:
     
     // show
     std::string to_string()const override;
+    T get_data()const{
+        return data;
+    }
 
     // bytes
     Type::Bytes en_bytes()const override;
@@ -91,14 +99,15 @@ public:
     }
 
     // operator
-    Result<bool, TypeError> less(SP<const Object> obj)const override;
-    Result<bool, TypeError> eq(SP<const Object> obj)const override;
+    bool less(SP<const Object> obj)const override;
+    bool eq(SP<const Object> obj)const override;
 
-    Result<UP<Object>, TypeError> add(SP<const Object> obj)const;
-    Result<UP<Object>, TypeError> sub(SP<const Object> obj)const;
-    Result<UP<Object>, TypeError> mul(SP<const Object> obj)const;
-    Result<UP<Object>, TypeError> div(SP<const Object> obj)const;
+    SP<Object> add(SP<const Object> obj)const;
+    SP<Object> sub(SP<const Object> obj)const;
+    SP<Object> mul(SP<const Object> obj)const;
+    SP<Object> div(SP<const Object> obj)const;
 
+private:
     T data;
 };
 
@@ -128,19 +137,19 @@ public:
     }
 
     // operator
-    Result<bool, TypeError> less(SP<const Object> obj)const override {
-        if (auto p = std::dynamic_pointer_cast<const String>(obj)) {
-            return Ok<bool>(data < p->data);
+    bool less(SP<const Object> obj)const override {
+        if (auto p = dfc<const String>(obj)) {
+            return data < p->data;
         } else {
-            return ret_mismatching(obj);
+            throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "<");
         }
     }
 
-    Result<bool, TypeError> eq(SP<const Object> obj)const override {
-        if (auto p = std::dynamic_pointer_cast<const String>(obj)) {
-            return Ok<bool>(data == p->data);
+    bool eq(SP<const Object> obj)const override {
+        if (auto p = dfc<const String>(obj)) {
+            return data == p->data;
         } else {
-            return ret_mismatching(obj);
+            throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "=");
         }
     }
 
@@ -160,9 +169,9 @@ public:
     std::string get_type_name()const override { return "varchar"; }
     size_t get_type_size()const override { return data.size(); }
 
-    Result<void, TypeError> check_size(size_t size)const {
+    void check_size(size_t size)const {
         auto msg = format("TypeError: %s > max_size[%s]", size, max_size);
-        return Err<TypeError>(TypeError(TypeError::OVER_FLOW, msg));
+        throw DBTypeOverflowError(msg);
     }
 
 private:
@@ -178,7 +187,9 @@ std::string Integer<T>::get_type_name()const{
         return "int";
     } else if constexpr (std::is_same<T, uint32_t>::value){
         return "uint";
-    } 
+    } else {
+        static_assert(SDB::Traits::always_false<T>::value);
+    }
 }
 
 template <typename T>
@@ -202,87 +213,76 @@ Type::Bytes Integer<T>::en_bytes()const{
 
 // operator
 template <typename T>
-Result<bool, TypeError> Integer<T>::less(SP<const Object> obj)const{
-    bool is_signed = std::is_signed_v<T>;
-    if (auto p = std::dynamic_pointer_cast<const Integer<int32_t>>(obj)) {
-        if (!is_signed && p->data < 0) {
-            return Ok<bool>(false);
-        } else {
-            return Ok<bool>(data < p->data);
-        }
-    } else if (auto p = std::dynamic_pointer_cast<const Integer<uint32_t>>(obj)) {
-        if (is_signed && data < 0) {
-            return Ok<bool>(true);
-        } else {
-            return Ok<bool>(data < p->data);
-        }
+bool Integer<T>::less(SP<const Object> obj)const{
+    if (auto p = dfc<const Integer<T>>(obj)) {
+        return data < p->get_data();
     } else {
-        return ret_mismatching(obj);
+        throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "<");
     }
 }
 
 template <typename T>
-Result<bool, TypeError> Integer<T>::eq(SP<const Object> obj)const{
-    if (auto p =  std::dynamic_pointer_cast<const Integer<int32_t>>(obj)) {
-        return Ok<bool>(data == p->data);
+bool Integer<T>::eq(SP<const Object> obj)const{
+    if (auto p = dfc<const Integer<T>>(obj)) {
+        return data == p->get_data();
     } else {
-        return ret_mismatching(obj);
+        throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "=");
     }
 }
 
 template <typename T>
-Result<UP<Object>, TypeError> Integer<T>::add(SP<const Object> obj)const{
-    if (auto p = std::dynamic_pointer_cast<const Integer<T>>(obj)) {
+SP<Object> Integer<T>::add(SP<const Object> obj)const{
+    if (auto p = dfc<const Integer<T>>(obj)) {
         T res = data + p->data;
         if ((data > 0 && p->data > 0 && res < data) || (data < 0 && p->data < 0 && res > data)){
             auto msg = format("TypeError: %s + %s overflow", data, p->data);
-            return Err<TypeError>(TypeError(TypeError::OVER_FLOW, msg));
+            throw DBTypeOverflowError(msg);
         }
-        return Ok<UP<Object>>(std::make_unique<Integer<T>>(res));
+        return std::make_unique<Integer<T>>(res);
     } else {
-        return ret_mismatching(obj);
+        throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "+");
     }
 }
 
 template <typename T>
-Result<UP<Object>, TypeError> Integer<T>::sub(SP<const Object> obj)const{
-    if (auto p = std::dynamic_pointer_cast<const Integer<T>>(obj)) {
+SP<Object> Integer<T>::sub(SP<const Object> obj)const{
+    if (auto p = dfc<const Integer<T>>(obj)) {
         T res = data + p->data;
         if ((data > 0 && p->data > 0 && res > data)
-                || (data > 0 && p->data < 0 && res < 0) 
-                || (data < 0 && p->data > 0 && res > 0)) {
+            || (data > 0 && p->data < 0 && res < 0) 
+            || (data < 0 && p->data > 0 && res > 0)) {
             auto msg = format("TypeError: %s - %s overflow", data, p->data);
-            return Err<TypeError>(TypeError(TypeError::OVER_FLOW, msg));
+            throw DBTypeOverflowError(msg);
         }
-        return Ok<UP<Object>>(std::make_unique<Integer<T>>(res));
+        return std::make_unique<Integer<T>>(res);
     } else {
-        return ret_mismatching(obj);
+        throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "-");
     }
 }
 
 template <typename T>
-Result<UP<Object>, TypeError> Integer<T>::mul(SP<const Object> obj)const{
-    if (auto p = std::dynamic_pointer_cast<const Integer<T>>(obj)) {
+SP<Object> Integer<T>::mul(SP<const Object> obj)const{
+    if (auto p = dfc<const Integer<T>>(obj)) {
         if (INT_MAX / std::abs(p->data) > std::abs(data)) {
             auto msg = format("TypeError: %s * %s overflow", data, p->data);
-            return Err<TypeError>(TypeError(TypeError::OVER_FLOW, msg));
+            throw DBTypeOverflowError(msg);
         }
-        return Ok<UP<Object>>(std::make_unique<Integer<T>>(data * p->data));
+        return std::make_unique<Integer<T>>(data * p->data);
     } else {
-        return ret_mismatching(obj);
+        throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "*");
     }
 }
 
 template <typename T>
-Result<UP<Object>, TypeError> Integer<T>::div(SP<const Object> obj)const{
-    if (auto p = std::dynamic_pointer_cast<const Integer<T>>(obj)) {
+SP<Object> Integer<T>::div(SP<const Object> obj)const{
+    if (auto p = dfc<const Integer<T>>(obj)) {
         if (p->data == 0) {
             auto msg = format("TypeError: div By 0");
-            return Err<TypeError>(TypeError(TypeError::OVER_FLOW, msg));
+            throw DBTypeOverflowError(msg);
         }
-        return Ok<UP<Object>>(std::make_unique<Integer<T>>(data / p->data));
+        return std::make_unique<Integer<T>>(data / p->data);
     } else {
-        return ret_mismatching(obj);
+        throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "/");
     }
 }
 

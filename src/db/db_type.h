@@ -51,6 +51,11 @@ struct DBTypeDivzeroError : public DBTypeError {
         :DBTypeError(format("TypeError: div By 0")){}
 };
 
+struct DBTypeNullError : public DBTypeError {
+    DBTypeNullError()
+        :DBTypeError(format("TypeError: null")){}
+};
+
 // ========== Object ==========
 class Object : public std::enable_shared_from_this<Object> {
 public:
@@ -74,6 +79,29 @@ public:
 // object alias
 using ObjPtr = SP<Object>;
 using ObjCntPtr = SP<const Object>;
+
+// ===== Null =====
+struct None : public Object {
+    TypeTag get_type_tag()const override {return NONE;}
+    std::string get_type_name()const override {return "null";}
+    size_t get_type_size()const override {return 0;}
+
+    // show
+    std::string to_string()const override {return "null";}
+    
+    // bytes
+    Bytes en_bytes()const override {return Bytes();}
+    void de_bytes(const Bytes &, size_t &)override{}
+
+    // operator
+    bool less(SP<const Object>)const override{
+        throw DBTypeNullError();
+    }
+
+    bool eq(SP<const Object>)const override{
+        throw DBTypeNullError();
+    }
+};
 
 // ===== Integer =====
 template <typename T>
@@ -182,6 +210,20 @@ public:
 private:
     size_t max_size;
 };
+
+// ========== type function ==========
+static ObjPtr get_default(TypeTag tag, size_t size) {
+    switch (tag) {
+        case INT:
+            return std::make_shared<Int>();
+        case UINT: 
+            return std::make_shared<UInt>();
+        case VARCHAR:
+            return std::make_shared<Varchar>(size);
+        default:
+            return std::make_shared<None>();
+    }
+}
 
 // ========== templat function ==========
 // ===== Integer =====

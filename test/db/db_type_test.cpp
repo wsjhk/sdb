@@ -18,7 +18,6 @@ TEST(db_db_type_test, integer_object) {
     auto bytes = sdb::en_bytes(10);
     size_t offset = 0;
     obj->de_bytes(bytes, offset);
-    std::cout << "==========" << std::endl;
     ASSERT_TRUE(obj->en_bytes() == bytes);
 
     SP<Object> int_obj = std::make_unique<Int>(10);

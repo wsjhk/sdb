@@ -2,7 +2,7 @@
 
 #include "../../src/db/util.h"
 
-using namespace SDB::Function;
+using namespace sdb;
 
 TEST(db_util_test, bytes) {
     // === int check

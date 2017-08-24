@@ -4,7 +4,7 @@
 #include "../../src/db/io.h"
 #include "../../src/db/util.h"
 
-using SDB::Type::Bytes;
+using namespace sdb;
 
 TEST(db_cache_test, BlockCache) {
     IO &io = IO::get();
@@ -13,10 +13,10 @@ TEST(db_cache_test, BlockCache) {
         io.delete_file(file_path);
     }
     io.create_file(file_path);
-    Bytes b0(SDB::Const::BLOCK_SIZE, 'a');
-    Bytes b1(SDB::Const::BLOCK_SIZE, 'b');
-    Bytes b2(SDB::Const::BLOCK_SIZE, 'c');
-    Bytes b3(SDB::Const::BLOCK_SIZE, 'd');
+    Bytes b0(BLOCK_SIZE, 'a');
+    Bytes b1(BLOCK_SIZE, 'b');
+    Bytes b2(BLOCK_SIZE, 'c');
+    Bytes b3(BLOCK_SIZE, 'd');
     if (true) {
         BlockCache cache(3);
         cache.put(file_path, 0, b0);

@@ -12,6 +12,8 @@
 
 #include "util.h"
 
+namespace sdb {
+
 // for log cache
 // class LogCache {
 // public:
@@ -26,7 +28,6 @@
 class BlockCache {
 public:
     // alias
-    using Bytes = SDB::Type::Bytes;
     using BytesPtr = std::shared_ptr<Bytes>;
 
     using CacheKey = std::string;
@@ -89,5 +90,7 @@ class CacheMaster {
         return cache;
     }
 };
+
+} // namespace sdb
 
 #endif //CACHE_H

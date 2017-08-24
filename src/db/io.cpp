@@ -17,14 +17,13 @@
 #include "../cpp_util/log.hpp"
 
 using std::ios;
-using SDB::Const::BLOCK_SIZE;
-using SDB::Type::Bytes;
 namespace ef = std::experimental::filesystem;
 
 using namespace cpp_util;
 
 // ========= public =========
 // dir
+namespace sdb {
 void IO::create_dir(const std::string &dir_path) {
     std::string abs_path = get_db_file_path(dir_path);
     bool sc = ef::create_directory(abs_path);
@@ -60,7 +59,7 @@ void IO::delete_file(const std::string &file_name) {
     }
 }
 
-SDB::Type::Bytes IO::read_file(const std::string &file_path) {
+Bytes IO::read_file(const std::string &file_path) {
     std::string abs_path = get_db_file_path(file_path);
     std::ifstream in(abs_path, std::ios::binary);
     assert_msg(in.is_open(), abs_path);
@@ -70,7 +69,7 @@ SDB::Type::Bytes IO::read_file(const std::string &file_path) {
     return buffer_data;
 }
 
-void IO::full_write_file(const std::string &file_path, const SDB::Type::Bytes &data) {
+void IO::full_write_file(const std::string &file_path, const Bytes &data) {
     std::string abs_path = get_db_file_path(file_path);
     assert_msg(has_file(file_path), abs_path);
     std::ofstream out(abs_path, ios::binary);
@@ -78,7 +77,7 @@ void IO::full_write_file(const std::string &file_path, const SDB::Type::Bytes &d
     out.close();
 }
 
-void IO::append_write_file(const std::string &file_path, const SDB::Type::Bytes &data) {
+void IO::append_write_file(const std::string &file_path, const Bytes &data) {
     std::string abs_path = get_db_file_path(file_path);
     assert_msg(has_file(file_path), abs_path);
     std::ofstream out(abs_path, ios::binary | ios::app);
@@ -86,7 +85,7 @@ void IO::append_write_file(const std::string &file_path, const SDB::Type::Bytes 
     out.close();
 }
 
-SDB::Type::Bytes IO::read_block(const std::string &file_path, size_t block_num) {
+Bytes IO::read_block(const std::string &file_path, size_t block_num) {
     // mmap read
     std::string abs_path = get_db_file_path(file_path);
     int fd = open(abs_path.data(), O_RDWR);
@@ -103,7 +102,7 @@ SDB::Type::Bytes IO::read_block(const std::string &file_path, size_t block_num) 
     return bytes;
 }
 
-void IO::write_block(const std::string &file_path, size_t block_num, const SDB::Type::Bytes &data){
+void IO::write_block(const std::string &file_path, size_t block_num, const Bytes &data){
     std::string abs_path = get_db_file_path(file_path);
     if (data.size() != BLOCK_SIZE) {
         throw std::runtime_error("Error: data size not equal BLOCK_SIZE");
@@ -141,3 +140,5 @@ std::string IO::get_db_file_path(const std::string &file_name) {
     std::string file_path = get_db_file_dir_path();
     return file_path + '/' + file_name;
 }
+
+} // namespace  sdb

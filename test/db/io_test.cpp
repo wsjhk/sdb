@@ -3,9 +3,7 @@
 #include "../../src/db/io.h"
 #include "../../src/db/util.h"
 
-using SDB::Type::Bytes;
-using SDB::Function::en_bytes;
-using SDB::Function::de_bytes;
+using namespace sdb;
 
 TEST(db_io_test, io) {
     IO &io = IO::get();
@@ -36,7 +34,7 @@ TEST(db_io_test, io) {
     bytes.insert(bytes.end(), append_bytes.begin(), append_bytes.end());
     ASSERT_TRUE(bytes == read_bytes);
 
-    bytes.resize(SDB::Const::BLOCK_SIZE);
+    bytes.resize(BLOCK_SIZE);
     io.write_block(file_path, 0, bytes);
     read_bytes = io.read_block(file_path, 0);
     ASSERT_TRUE(bytes == read_bytes);

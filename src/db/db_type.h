@@ -11,9 +11,10 @@
 #include "../cpp_util/str.hpp"
 
 
-namespace SDB::DBType {
-// util type
-using Bytes = Type::Bytes;
+namespace sdb::db_type {
+using cpp_util::format;
+
+// alias type
 template <typename T>
 using SP = std::shared_ptr<T>;
 
@@ -21,8 +22,6 @@ template <typename T, typename U>
 inline std::shared_ptr<T> dfc(U &&u) {
     return std::dynamic_pointer_cast<T>(std::forward<U>(u));
 }
-
-using namespace cpp_util;
 
 // type tag
 enum TypeTag : char {
@@ -64,13 +63,17 @@ public:
     virtual std::string to_string()const =0;
     
     // bytes
-    virtual Type::Bytes en_bytes()const =0;
-    virtual void de_bytes(const Type::Bytes &bytes, size_t &offset)=0;
+    virtual Bytes en_bytes()const =0;
+    virtual void de_bytes(const Bytes &bytes, size_t &offset)=0;
 
     // operator
     virtual bool less(SP<const Object> obj)const =0;
     virtual bool eq(SP<const Object> obj)const =0;
 };
+
+// object alias
+using ObjPtr = SP<Object>;
+using ObjCntPtr = SP<const Object>;
 
 // ===== Integer =====
 template <typename T>
@@ -87,12 +90,16 @@ public:
     size_t get_type_size()const override {return sizeof(T);};
     
     // show
-    std::string to_string()const override;
+    std::string to_string()const override {
+        return std::to_string(data);
+    }
 
     // bytes
-    Type::Bytes en_bytes()const override;
-    void de_bytes(const Type::Bytes &bytes, size_t &offset) override {
-        Function::de_bytes(data, bytes, offset);
+    Bytes en_bytes()const override {
+        return sdb::en_bytes(data);
+    }
+    void de_bytes(const Bytes &bytes, size_t &offset) override {
+        sdb::de_bytes(data, bytes, offset);
     }
 
     // operator
@@ -126,10 +133,10 @@ public:
     
     // bytes
     Bytes en_bytes()const override{
-        return Function::en_bytes(data);
+        return sdb::en_bytes(data);
     }
-    void de_bytes(const Type::Bytes &bytes, size_t &offset) override {
-        Function::de_bytes(data, bytes, offset);
+    void de_bytes(const Bytes &bytes, size_t &offset) override {
+        sdb::de_bytes(data, bytes, offset);
     }
 
     // operator
@@ -186,7 +193,7 @@ std::string Integer<T>::get_type_name()const{
     } else if constexpr (std::is_same<T, uint32_t>::value){
         return "uint";
     } else {
-        static_assert(SDB::Traits::always_false<T>::value);
+        static_assert(Traits::always_false<T>::value);
     }
 }
 
@@ -197,16 +204,6 @@ TypeTag Integer<T>::get_type_tag()const{
     } else if constexpr (std::is_same<T, uint32_t>::value){
         return UINT;
     } 
-}
-
-template <typename T>
-std::string Integer<T>::to_string()const{
-    return std::to_string(data);
-}
-
-template <typename T>
-Type::Bytes Integer<T>::en_bytes()const{
-    return Function::en_bytes(data);
 }
 
 // operator
@@ -283,9 +280,6 @@ SP<Object> Integer<T>::div(SP<const Object> obj)const{
     }
 }
 
-} // SDB::Type namespace
+} // sdb::DBType namespace
 
-namespace SDB::Function {
-
-} // SDB::Function namespace
 #endif /* ifndef DB_TYPE */

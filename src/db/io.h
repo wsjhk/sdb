@@ -8,11 +8,10 @@
 #include <string>
 #include "util.h"
 
+namespace sdb {
+
 class IO {
 public:
-    // type alias
-    using Bytes = SDB::Type::Bytes;
-
     static IO &get() {
         static IO io;
         return io;
@@ -28,12 +27,12 @@ public:
 
     Bytes read_file(const std::string &file_path);
 
-    void full_write_file(const std::string &file_path, const SDB::Type::Bytes &data);
-    void append_write_file(const std::string &file_path, const SDB::Type::Bytes &data);
+    void full_write_file(const std::string &file_path, const Bytes &data);
+    void append_write_file(const std::string &file_path, const Bytes &data);
 
     // block
     Bytes read_block(const std::string &file_path, size_t block_num);
-    void write_block(const std::string &file_path, size_t block_num, const SDB::Type::Bytes &data);
+    void write_block(const std::string &file_path, size_t block_num, const Bytes &data);
 
     // get
     bool has_file(const std::string &str);
@@ -53,5 +52,7 @@ private:
     IO &operator=(IO &&io)=delete;
 
 };
+
+} // namespacce sdb
 
 #endif

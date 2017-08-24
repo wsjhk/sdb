@@ -5,11 +5,12 @@
 #include "io.h"
 #include "../cpp_util/log.hpp"
 
-using namespace SDB;
 using namespace cpp_util;
 
+namespace sdb {
+
 // ========== public function ==========
-BlockCache::Bytes BlockCache::get(const std::string &path, size_t block_num) {
+Bytes BlockCache::get(const std::string &path, size_t block_num) {
     mutex.lock();
     CacheKey key = encode_key(path, block_num);
     auto it = key_map.find(key);
@@ -49,7 +50,7 @@ void BlockCache::put(const std::string &path, size_t block_num, const Bytes &byt
     mutex.unlock();
 }
 
-BlockCache::Bytes BlockCache::read_block(const std::string &path, size_t block_num) {
+Bytes BlockCache::read_block(const std::string &path, size_t block_num) {
     // read cache
     IO &io = IO::get();
     Bytes cache_bytes = io.read_block(path, block_num);
@@ -92,3 +93,5 @@ void BlockCache::pop() {
     key_map.erase(key);
     value_list.pop_back();
 }
+
+} // namespace sdb

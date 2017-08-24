@@ -77,7 +77,7 @@ template <typename T>
 struct Integer : public Object {
 public:
     Integer():data(0){}
-    Integer(T data):data(data){
+    explicit Integer(T data):data(data){
         static_assert(std::is_integral_v<T>);
     }
 
@@ -88,9 +88,6 @@ public:
     
     // show
     std::string to_string()const override;
-    T get_data()const{
-        return data;
-    }
 
     // bytes
     Type::Bytes en_bytes()const override;
@@ -107,7 +104,6 @@ public:
     SP<Object> mul(SP<const Object> obj)const;
     SP<Object> div(SP<const Object> obj)const;
 
-private:
     T data;
 };
 
@@ -161,8 +157,8 @@ public:
 class Varchar : public String {
 public:
     Varchar()=delete;
-    Varchar(size_t s):String(), max_size(s){ check_size(s); }
-    Varchar(const std::string str, size_t s):String(str), max_size(s){check_size(s);}
+    Varchar(size_t s):String(), max_size(s){}
+    Varchar(const std::string str, size_t s):String(str), max_size(s){check_size(str.size());}
 
     // type
     TypeTag get_type_tag()const override { return VARCHAR; }
@@ -170,8 +166,10 @@ public:
     size_t get_type_size()const override { return data.size(); }
 
     void check_size(size_t size)const {
-        auto msg = format("TypeError: %s > max_size[%s]", size, max_size);
-        throw DBTypeOverflowError(msg);
+        if (size > max_size) {
+            auto msg = format("TypeError: %s > max_size[%s]", size, max_size);
+            throw DBTypeOverflowError(msg);
+        }
     }
 
 private:
@@ -215,7 +213,7 @@ Type::Bytes Integer<T>::en_bytes()const{
 template <typename T>
 bool Integer<T>::less(SP<const Object> obj)const{
     if (auto p = dfc<const Integer<T>>(obj)) {
-        return data < p->get_data();
+        return data < p->data;
     } else {
         throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "<");
     }
@@ -224,7 +222,7 @@ bool Integer<T>::less(SP<const Object> obj)const{
 template <typename T>
 bool Integer<T>::eq(SP<const Object> obj)const{
     if (auto p = dfc<const Integer<T>>(obj)) {
-        return data == p->get_data();
+        return data == p->data;
     } else {
         throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "=");
     }
@@ -247,7 +245,7 @@ SP<Object> Integer<T>::add(SP<const Object> obj)const{
 template <typename T>
 SP<Object> Integer<T>::sub(SP<const Object> obj)const{
     if (auto p = dfc<const Integer<T>>(obj)) {
-        T res = data + p->data;
+        T res = data - p->data;
         if ((data > 0 && p->data > 0 && res > data)
             || (data > 0 && p->data < 0 && res < 0) 
             || (data < 0 && p->data > 0 && res > 0)) {
@@ -263,7 +261,7 @@ SP<Object> Integer<T>::sub(SP<const Object> obj)const{
 template <typename T>
 SP<Object> Integer<T>::mul(SP<const Object> obj)const{
     if (auto p = dfc<const Integer<T>>(obj)) {
-        if (INT_MAX / std::abs(p->data) > std::abs(data)) {
+        if (std::numeric_limits<T>::max() / std::abs(p->data) < std::abs(data)) {
             auto msg = format("TypeError: %s * %s overflow", data, p->data);
             throw DBTypeOverflowError(msg);
         }
@@ -277,8 +275,7 @@ template <typename T>
 SP<Object> Integer<T>::div(SP<const Object> obj)const{
     if (auto p = dfc<const Integer<T>>(obj)) {
         if (p->data == 0) {
-            auto msg = format("TypeError: div By 0");
-            throw DBTypeOverflowError(msg);
+            throw DBTypeDivzeroError();
         }
         return std::make_unique<Integer<T>>(data / p->data);
     } else {

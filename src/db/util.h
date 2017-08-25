@@ -15,6 +15,8 @@
 #include <unordered_set>
 #include <boost/spirit/home/support/container.hpp>
 
+#include "../cpp_util/error.hpp"
+
 namespace sdb {
 
 // const
@@ -137,7 +139,7 @@ inline Bytes en_bytes(T &&t, Args... args) {
 
 // === de_bytes ===
 inline void _bytes_length_check(size_t size, const Bytes &bytes, size_t offset){
-    assert(size <= bytes.size() - offset);
+    assert_msg(size <= bytes.size() - offset, "");
 }
 
 template <typename T>

@@ -85,7 +85,7 @@ void IO::append_write_file(const std::string &file_path, const Bytes &data) {
     out.close();
 }
 
-Block IO::read_block(const std::string &file_path, size_t block_num) {
+Bytes IO::read_block(const std::string &file_path, size_t block_num) {
     // mmap read
     std::string abs_path = get_db_file_path(file_path);
     int fd = open(abs_path.data(), O_RDWR);
@@ -95,7 +95,7 @@ Block IO::read_block(const std::string &file_path, size_t block_num) {
         write(fd, "", 1);
     }
     char *buff = (char*)mmap(nullptr, BLOCK_SIZE, PROT_READ, MAP_SHARED, fd, BLOCK_SIZE*block_num);
-    Block block;
+    Bytes block(BLOCK_SIZE);
     std::memcpy(block.data(), buff, BLOCK_SIZE);
     munmap(buff, BLOCK_SIZE);
     close(fd);
@@ -103,7 +103,7 @@ Block IO::read_block(const std::string &file_path, size_t block_num) {
     return block;
 }
 
-void IO::write_block(const std::string &file_path, size_t block_num, const Block &data){
+void IO::write_block(const std::string &file_path, size_t block_num, const Bytes &data){
     std::string abs_path = get_db_file_path(file_path);
     int fd = open(abs_path.data(), O_RDWR);
     assert_msg(fd >= 0, abs_path);

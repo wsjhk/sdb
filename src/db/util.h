@@ -28,12 +28,11 @@ constexpr Size BLOCK_SIZE = 4096;
 
 // - Pos -
 using BlockNum = int64_t;
-using BlockOffset = int32_t;
+using BlockOffset = Size;
 
 // bytes
 using Byte = char;
 using Bytes = std::vector<Byte>;
-using Block = std::array<Byte, BLOCK_SIZE>;
 
 // traits
 namespace Traits {

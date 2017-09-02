@@ -6,12 +6,11 @@
 
 namespace sdb {
 
-class TuplesError : public std::runtime_error {
-    TuplesError(const std::string &str):runtime_error(str){}
-};
+struct Tuples {
+    // type
+    using Tuple = std::vector<db_type::ObjPtr>;
 
-class Tuples {
-public: 
+    // constructor
     Tuples(int col_num):col_num(col_num){}
     Tuples(const Tuples &);
     Tuples(Tuples &&);
@@ -19,8 +18,8 @@ public:
     Tuples &operator=(Tuples &&);
 
     // tuple 
-    static std::vector<db_type::ObjPtr> tuple_clone(const std::vector<db_type::ObjPtr> &tuple);
-    void push_back(const std::vector<db_type::ObjPtr> &tuple);
+    static Tuple tuple_clone(const Tuple &tuple);
+    static Size tuple_type_size(const Tuple &tuple);
 
     // map
     Tuples map(std::function<db_type::ObjPtr(db_type::ObjCntPtr)> op, int col_offset)const;
@@ -31,8 +30,8 @@ public:
     void invaded_filter(std::function<bool(db_type::ObjCntPtr)> pred, int col_offset);
 
     // range
-    void range(std::function<void(std::vector<db_type::ObjPtr>)> fn);
-    void range(int beg, int offset, std::function<void(std::vector<db_type::ObjPtr>)> fn);
+    void range(std::function<void(Tuple)> fn);
+    void range(int beg, int offset, std::function<void(Tuple)> fn);
 
     // bytes
     Bytes en_bytes()const;
@@ -41,9 +40,8 @@ public:
     // debug
     void print()const;
 
-private: // menber
     const int col_num;
-    std::vector<std::vector<db_type::ObjPtr>> data;
+    std::vector<Tuple> data;
 };
 
 } // namespace sdb

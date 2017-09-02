@@ -10,22 +10,22 @@ using namespace cpp_util;
 namespace sdb {
 
 // ========== public function ==========
-Block BlockCache::get(const std::string &path, size_t block_num) {
+Bytes BlockCache::get(const std::string &path, size_t block_num) {
     mutex.lock();
     CacheKey key = encode_key(path, block_num);
     auto it = key_map.find(key);
     if (it == key_map.end()) {
-        Block block = read_block(path, block_num);
+        Bytes block = read_block(path, block_num);
         if (value_list.size() >= max_block_count) {
             pop();
         }
-        value_list.push_front(CacheValue(key, std::make_shared<Block>(block)));
+        value_list.push_front(CacheValue(key, std::make_shared<Bytes>(block)));
         key_map[key] = value_list.begin();
         mutex.unlock();
         return block;
     }
     BlockPtr ptr = it->second->ptr;
-    Block block = *ptr;
+    Bytes block = *ptr;
     value_list.erase(it->second);
     value_list.push_front(CacheValue(key, ptr));
     it->second = value_list.begin();
@@ -33,10 +33,10 @@ Block BlockCache::get(const std::string &path, size_t block_num) {
     return block;
 }
 
-void BlockCache::put(const std::string &path, size_t block_num, const Block &data) {
+void BlockCache::put(const std::string &path, size_t block_num, const Bytes &data) {
     mutex.lock();
     CacheKey key = encode_key(path, block_num);
-    BlockPtr ptr = std::make_shared<Block>(data);
+    BlockPtr ptr = std::make_shared<Bytes >(data);
     auto it = key_map.find(key);
     if (it == key_map.end()) {
         value_list.push_front(CacheValue(key, ptr));
@@ -50,10 +50,10 @@ void BlockCache::put(const std::string &path, size_t block_num, const Block &dat
     mutex.unlock();
 }
 
-Block BlockCache::read_block(const std::string &path, size_t block_num) {
+Bytes BlockCache::read_block(const std::string &path, size_t block_num) {
     // read cache
     IO &io = IO::get();
-    Block cache_block = io.read_block(path, block_num);
+    Bytes cache_block = io.read_block(path, block_num);
     return cache_block;
 }
 

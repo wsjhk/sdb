@@ -27,9 +27,7 @@ TEST(db_util_test, bytes) {
     std::string str = "asdf";
     std::set<int> set = {1, 2, 3};
     std::unordered_map<int, int> map = {{1, 1}, {2, 2}};
-    std::cout << en_bytes(str).size() << std::endl;
     Bytes mul_bytes = en_bytes(str, set, map);
-    std::cout << mul_bytes.size() << std::endl;
     std::string new_str;
     std::set<int> new_set;
     std::unordered_map<int, int> new_map;

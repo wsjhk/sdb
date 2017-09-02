@@ -9,12 +9,11 @@ Bytes ColProperty::en_bytes()const {
     return sdb::en_bytes(col_name, col_type, type_size, default_value->en_bytes(), is_not_null);
 }
 
-ColProperty ColProperty::de_bytes(const Bytes &bytes, Pos &offset){
+ColProperty ColProperty::de_bytes(const Bytes &bytes, Size &offset){
     // cal name
     std::string col_name;
     sdb::de_bytes(col_name, bytes, offset);
     // type
-    
     TypeTag type;
     sdb::de_bytes(type, bytes, offset);
     // type_size

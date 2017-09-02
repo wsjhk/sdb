@@ -34,9 +34,9 @@ TEST(db_io_test, io) {
     bytes.insert(bytes.end(), append_bytes.begin(), append_bytes.end());
     ASSERT_TRUE(bytes == read_bytes);
 
-    Block block = {{'a', 'b'}};
+    Bytes block(BLOCK_SIZE, 'a');
     io.write_block(file_path, 0, block);
-    Block read_block = io.read_block(file_path, 0);
+    Bytes read_block = io.read_block(file_path, 0);
     ASSERT_TRUE(block == read_block);
 
     //  remove

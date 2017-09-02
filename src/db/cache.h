@@ -28,7 +28,7 @@ namespace sdb {
 class BlockCache {
 public:
     // alias
-    using BlockPtr = std::shared_ptr<Block>;
+    using BlockPtr = std::shared_ptr<Bytes>;
 
     using CacheKey = std::string;
     using KeyPair = std::pair<std::string, BlockNum>;
@@ -49,8 +49,8 @@ public:
     BlockCache &operator=(BlockCache &&)=delete;
 
     // get and put
-    Block get(const std::string &path, size_t block_num);
-    void put(const std::string &path, size_t block_num, const Block &data);
+    Bytes get(const std::string &path, size_t block_num);
+    void put(const std::string &path, size_t block_num, const Bytes &data);
 
     // sync all cache
     void sync();
@@ -69,7 +69,7 @@ private:
     KeyPair decode_key(const std::string &key);
 
     // block io
-    Block read_block(const std::string &path, size_t block_num);
+    Bytes read_block(const std::string &path, size_t block_num);
 
     // pop
     void pop();
@@ -85,7 +85,8 @@ private:
 };
 
 class CacheMaster {
-    BlockCache &get_misc_cache() {
+public:
+    static BlockCache &get_misc_cache() {
         static BlockCache cache(100);
         return cache;
     }

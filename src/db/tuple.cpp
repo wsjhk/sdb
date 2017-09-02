@@ -7,11 +7,23 @@ namespace sdb {
 using db_type::ObjPtr;
 using db_type::ObjCntPtr;
 
-Tuples::Tuples(const Tuples &tuples):col_num(tuples.col_num) {
+Tuples::Tuples(const Tuples &tuples):col_num(tuples.col_num){
+    *this = tuples;
+}
 
-Tuples(Tuples &&);
-Tuples &operator=(const Tuples &);
-Tuples &operator=(Tuples &&);
+Tuples::Tuples(Tuples &&tuples):col_num(tuples.col_num) {
+    *this = std::move(tuples);
+}
+
+Tuples &Tuples::operator=(const Tuples &tuples) {
+    for (auto &&tuple : tuples.data) {
+        data.push_back(tuple_clone(tuple));
+    }
+}
+
+Tuples &Tuples::operator=(Tuples &&tuples) {
+    data = std::move(tuples.data);
+}
 
 // tuple
 std::vector<ObjPtr> Tuples::tuple_clone(const std::vector<db_type::ObjPtr> &tuple) {
@@ -22,12 +34,12 @@ std::vector<ObjPtr> Tuples::tuple_clone(const std::vector<db_type::ObjPtr> &tupl
     return ret;
 }
 
-void Tuples::push_back(const std::vector<db_type::ObjPtr> &tuple) {
-    std::vector<ObjPtr> v;
+Size Tuples::tuple_type_size(const Tuple &tuple) {
+    Size sum;
     for (auto &&ptr : tuple) {
-        v.push_back(ptr->clone());
+        sum += ptr->get_type_size();
     }
-    data.push_back(v);
+    return sum;
 }
 
 // map
@@ -37,7 +49,7 @@ Tuples Tuples::map(std::function<db_type::ObjPtr(db_type::ObjCntPtr)> op, int co
     for (auto &&tuple : data) {
         std::vector<ObjPtr> tuple_copy = tuple_clone(tuple);
         tuple_copy[col_offset] = op(tuple[col_offset]);
-        tuples.push_back(tuple_copy);
+        tuples.data.push_back(tuple_copy);
     }
     return tuples;
 }
@@ -55,7 +67,7 @@ Tuples Tuples::filter(std::function<bool(db_type::ObjCntPtr)> pred, int col_offs
     Tuples tuples(col_num);
     for (auto &&tuple: data) {
         if (pred(tuple[col_offset])) {
-            tuples.push_back(tuple_clone(tuple));
+            tuples.data.push_back(tuple_clone(tuple));
         }
     }
     return tuples;

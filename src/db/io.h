@@ -31,8 +31,8 @@ public:
     void append_write_file(const std::string &file_path, const Bytes &data);
 
     // block
-    Block read_block(const std::string &file_path, size_t block_num);
-    void write_block(const std::string &file_path, size_t block_num, const Block &data);
+    Bytes read_block(const std::string &file_path, size_t block_num);
+    void write_block(const std::string &file_path, size_t block_num, const Bytes &data);
 
     // get
     bool has_file(const std::string &str);

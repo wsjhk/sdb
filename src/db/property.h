@@ -32,7 +32,7 @@ struct ColProperty {
          is_not_null(is_not_null){}
 
     Bytes en_bytes()const;
-    static ColProperty de_bytes(const Bytes &bytes, Pos &offset);
+    static ColProperty de_bytes(const Bytes &bytes, Size &offset);
 };
 
 // table property

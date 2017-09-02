@@ -13,10 +13,10 @@ TEST(db_cache_test, BlockCache) {
         io.delete_file(file_path);
     }
     io.create_file(file_path);
-    Block b0{{'a'}};
-    Block b1{{'b'}};
-    Block b2{{'c'}};
-    Block b3{{'d'}};
+    Bytes b0(BLOCK_SIZE, 'a');
+    Bytes b1(BLOCK_SIZE, 'b');
+    Bytes b2(BLOCK_SIZE, 'c');
+    Bytes b3(BLOCK_SIZE, 'd');
     if (true) {
         BlockCache cache(3);
         cache.put(file_path, 0, b0);
@@ -33,7 +33,7 @@ TEST(db_cache_test, BlockCache) {
         it = std::next(it);
         ASSERT_TRUE(*it->ptr == b2);
         // get and sync
-        Block read_block = cache.get(file_path, 1);
+        Bytes read_block = cache.get(file_path, 1);
         ASSERT_TRUE(read_block == b1);
 
         // sync all cache

@@ -77,6 +77,9 @@ public:
     // operator
     virtual bool less(SP<const Object> obj)const =0;
     virtual bool eq(SP<const Object> obj)const =0;
+    
+    // assignment
+    virtual void assign(SP<const Object> obj) =0;
 };
 
 // object alias
@@ -107,6 +110,10 @@ struct None : public Object {
     }
 
     bool eq(SP<const Object>)const override{
+        throw DBTypeNullError();
+    }
+
+    void assign(SP<const Object>) override{
         throw DBTypeNullError();
     }
 };
@@ -151,6 +158,8 @@ public:
     SP<Object> sub(SP<const Object> obj)const;
     SP<Object> mul(SP<const Object> obj)const;
     SP<Object> div(SP<const Object> obj)const;
+
+    void assign(SP<const Object> obj) override;
 
     T data;
 };
@@ -205,7 +214,9 @@ public:
 class Varchar : public String {
 public:
     Varchar()=delete;
-    Varchar(int s):String(), max_size(s){}
+    Varchar(int s):String(), max_size(s){
+        assert(max_size <= 512);
+    }
     Varchar(const std::string &str, int s):String(str), max_size(s){check_size(str.size());}
 
     // type
@@ -217,7 +228,8 @@ public:
     std::shared_ptr<Object> clone()const override {
         return std::make_shared<Varchar>(data, max_size);
     }
-    
+
+    void assign(SP<const Object> obj) override;
 
     void check_size(int size)const {
         if (size > max_size || size < 0) {
@@ -340,6 +352,25 @@ SP<Object> Integer<T>::div(SP<const Object> obj)const{
         throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "/");
     }
 }
+
+// template <typename T>
+// void Integer<T>::assign(SP<const Object> obj) {
+//     if (auto p = dfc<const Integer<T>>(obj)) {
+//         data = p->data;
+//     } else {
+//         throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "/");
+//     }
+// }
+
+template <typename T>
+void Integer<T>::assign(SP<const Object> obj) {
+    if (auto p = dfc<const Integer<T>>(obj)) {
+        data = p->data;
+    } else {
+        throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "<");
+    }
+}
+
 
 } // sdb::DBType namespace
 

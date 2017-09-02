@@ -62,14 +62,17 @@ public:
     // type
     virtual TypeTag get_type_tag()const =0;
     virtual std::string get_type_name()const =0;
-    virtual size_t get_type_size()const =0;
+    virtual int get_type_size()const =0;
 
     // show
     virtual std::string to_string()const =0;
+
+    // clone
+    virtual std::shared_ptr<Object> clone()const =0;
     
     // bytes
     virtual Bytes en_bytes()const =0;
-    virtual void de_bytes(const Bytes &bytes, size_t &offset)=0;
+    virtual void de_bytes(const Bytes &bytes, int &offset)=0;
 
     // operator
     virtual bool less(SP<const Object> obj)const =0;
@@ -84,14 +87,19 @@ using ObjCntPtr = SP<const Object>;
 struct None : public Object {
     TypeTag get_type_tag()const override {return NONE;}
     std::string get_type_name()const override {return "null";}
-    size_t get_type_size()const override {return 0;}
+    int get_type_size()const override {return 0;}
 
     // show
     std::string to_string()const override {return "null";}
     
+    // clone
+    std::shared_ptr<Object> clone()const override {
+        return std::make_shared<None>();
+    }
+
     // bytes
     Bytes en_bytes()const override {return Bytes();}
-    void de_bytes(const Bytes &, size_t &)override{}
+    void de_bytes(const Bytes &, int &)override{}
 
     // operator
     bool less(SP<const Object>)const override{
@@ -115,18 +123,23 @@ public:
     // type
     TypeTag get_type_tag()const override;
     std::string get_type_name()const override;
-    size_t get_type_size()const override {return sizeof(T);};
+    int get_type_size()const override {return sizeof(T);};
     
     // show
     std::string to_string()const override {
         return std::to_string(data);
     }
 
+    // clone
+    std::shared_ptr<Object> clone()const override {
+        return std::make_shared<Integer<T>>(data);
+    }
+
     // bytes
     Bytes en_bytes()const override {
         return sdb::en_bytes(data);
     }
-    void de_bytes(const Bytes &bytes, size_t &offset) override {
+    void de_bytes(const Bytes &bytes, int &offset) override {
         sdb::de_bytes(data, bytes, offset);
     }
 
@@ -158,12 +171,12 @@ public:
 
     // show
     std::string to_string()const override{return data;}
-    
+
     // bytes
     Bytes en_bytes()const override{
         return sdb::en_bytes(data);
     }
-    void de_bytes(const Bytes &bytes, size_t &offset) override {
+    void de_bytes(const Bytes &bytes, int &offset) override {
         sdb::de_bytes(data, bytes, offset);
     }
 
@@ -192,27 +205,33 @@ public:
 class Varchar : public String {
 public:
     Varchar()=delete;
-    Varchar(size_t s):String(), max_size(s){}
-    Varchar(const std::string str, size_t s):String(str), max_size(s){check_size(str.size());}
+    Varchar(int s):String(), max_size(s){}
+    Varchar(const std::string &str, int s):String(str), max_size(s){check_size(str.size());}
 
     // type
     TypeTag get_type_tag()const override { return VARCHAR; }
     std::string get_type_name()const override { return "varchar"; }
-    size_t get_type_size()const override { return data.size(); }
+    int get_type_size()const override { return data.size(); }
 
-    void check_size(size_t size)const {
-        if (size > max_size) {
+    // clone
+    std::shared_ptr<Object> clone()const override {
+        return std::make_shared<Varchar>(data, max_size);
+    }
+    
+
+    void check_size(int size)const {
+        if (size > max_size || size < 0) {
             auto msg = format("TypeError: %s > max_size[%s]", size, max_size);
             throw DBTypeOverflowError(msg);
         }
     }
 
 private:
-    size_t max_size;
+    int max_size;
 };
 
 // ========== type function ==========
-static ObjPtr get_default(TypeTag tag, size_t size) {
+static ObjPtr get_default(TypeTag tag, int size) {
     switch (tag) {
         case INT:
             return std::make_shared<Int>();

@@ -28,16 +28,16 @@ namespace sdb {
 class BlockCache {
 public:
     // alias
-    using BytesPtr = std::shared_ptr<Bytes>;
+    using BlockPtr = std::shared_ptr<Block>;
 
     using CacheKey = std::string;
-    using KeyPair = std::pair<std::string, size_t>;
+    using KeyPair = std::pair<std::string, BlockNum>;
 
     struct CacheValue {
         CacheKey key;
-        BytesPtr ptr;
+        BlockPtr ptr;
         CacheValue()=delete;
-        CacheValue(const std::string &key, const BytesPtr &ptr):key(key), ptr(ptr){}
+        CacheValue(const std::string &key, BlockPtr ptr):key(key), ptr(ptr){}
     };
 
     using ValueList = std::list<CacheValue>;
@@ -49,8 +49,8 @@ public:
     BlockCache &operator=(BlockCache &&)=delete;
 
     // get and put
-    Bytes get(const std::string &path, size_t block_num);
-    void put(const std::string &path, size_t block_num, const Bytes &bytes);
+    Block get(const std::string &path, size_t block_num);
+    void put(const std::string &path, size_t block_num, const Block &data);
 
     // sync all cache
     void sync();
@@ -69,7 +69,7 @@ private:
     KeyPair decode_key(const std::string &key);
 
     // block io
-    Bytes read_block(const std::string &path, size_t block_num);
+    Block read_block(const std::string &path, size_t block_num);
 
     // pop
     void pop();

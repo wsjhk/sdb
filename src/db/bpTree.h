@@ -10,62 +10,42 @@
 #include <functional>
 
 #include "util.h"
+#include "db_type.h"
 #include "record.h"
+#include "property.h"
+
+namespace sdb {
 
 struct BptNode {
     // type
-//    using lstSecType = boost::variant<std::shared_ptr<Bytes>, std::shared_ptr<BptNode>>;
-//    using lstItemType = std::pair<Value, lstSecType>;
-//    using lstType = std::list<lstItemType>;
-    using Value = SDB::Type::Value;
-    using Bytes = SDB::Type::Bytes;
-    using Pos = SDB::Type::Pos;
-    using lstPosItemType = std::pair<SDB::Type::Value, SDB::Type::Pos>;
-    using PoslstType = std::list<lstPosItemType>;
-    using nodePtrType = std::shared_ptr<BptNode>;
-
-//    std::list<std::pair<Value, lstSecType>> lst;
-    std::list<std::pair<Value, Pos>> pos_lst;
-//    std::shared_ptr<BptNode> end_ptr;
+    std::list<std::pair<DBType::ObjPtr, Pos>> pos_lst;
     bool is_leaf = true;
     bool is_new_node = true;
-    Pos end_pos = 0;
+    // Pos end_pos = 0;
+    Pos right_node_pos = 0;
     Pos file_pos = 0;
 
     // === 节点操作 ===
     // 获取节点最后的key
-    Value last_key()const;
-    
-    // lstSecType 
-//    static std::shared_ptr<Bytes> &get_data_ptr(lstSecType &sec){
-//        return boost::get<std::shared_ptr<Bytes>>(sec);
-//    }
-//    static std::shared_ptr<BptNode> &get_node_ptr(lstSecType &sec){
-//        return boost::get<std::shared_ptr<BptNode>>(sec);
-//    }
 };
 
-class BpTree{
+class BpTree {
 public:
     // === type ===
-    using Value = SDB::Type::Value;
-    using Bytes = SDB::Type::Bytes;
-    using Pos = SDB::Type::Pos;
-    using PosList = SDB::Type::PosList;
     using nodePtrType = std::shared_ptr<BptNode>;
-    using nodePosLstType = typename BptNode::PoslstType;
-    using TableProperty = SDB::Type::TableProperty;
-//    using nodeLstItemType = typename BptNode<Value, Bytes>::lstItemType;
-//    using nodeLstType = typename BptNode<Value, Bytes>::lstType;
 
     BpTree()= delete;
-    BpTree(const SDB::Type::TableProperty &table_property);
+    BpTree(const TableProperty &table_property);
     // 禁止树的复制，防止文件读写不一致
     BpTree(const BpTree &bpt)= delete;
     BpTree(BpTree &&bpt)= delete;
     const BpTree &operator=(const BpTree &bpt)= delete;
     BpTree &operator=(BpTree &&bpt)= delete;
     ~BpTree();
+
+    static void create(const TableProperty &property);
+    static void drop(const TableProperty &property);
+
     void clear();
     void write_info_block();
 
@@ -83,17 +63,8 @@ public:
 
     // debug log
     void print()const;
-    static void create(const TableProperty &property);
-    static void drop(const TableProperty &property);
 
 private:
-//    nodePtrType root;
-    Pos root_pos;
-    SDB::Type::PosList free_pos_list;
-    Pos free_end_pos;
-    size_t node_key_count;
-    SDB::Type::TableProperty table_property;
-
     void initialize();
 
     bool is_node_less(nodePtrType ptr)const;
@@ -126,6 +97,16 @@ private:
     void throw_error(const std::string &str)const{
         throw std::runtime_error(str);
     }
+
+private:
+//    nodePtrType root;
+    Pos root_pos;
+    SDB::Type::PosList free_pos_list;
+    Pos free_end_pos;
+    size_t node_key_count;
+    SDB::Type::TableProperty table_property;
 };
+
+} // namespace sdb
 
 #endif /* BPTREE_H */

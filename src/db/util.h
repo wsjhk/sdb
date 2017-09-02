@@ -20,19 +20,20 @@
 namespace sdb {
 
 // const
-// static const size_t BLOCK_SIZE = size_t(getpagesize());
-constexpr size_t BLOCK_SIZE = 4096;
-static const size_t SIZE_SIZE = sizeof(size_t);
-static const size_t INT_SIZE = sizeof(int32_t);
-static const size_t FLOAT_SIZE = sizeof(float);
-static const size_t POS_SIZE = sizeof(size_t);
+// static const Size BLOCK_SIZE = size_t(getpagesize());
+// size
+using Size = int32_t;
+
+constexpr Size BLOCK_SIZE = 4096;
 
 // - Pos -
-using Pos = size_t;
+using BlockNum = int64_t;
+using BlockOffset = int32_t;
 
 // bytes
 using Byte = char;
 using Bytes = std::vector<Byte>;
+using Block = std::array<Byte, BLOCK_SIZE>;
 
 // traits
 namespace Traits {
@@ -104,11 +105,11 @@ template <typename T>
 inline Bytes en_bytes(T t) {
     Bytes bytes;
     if constexpr (std::is_same_v<std::remove_reference_t<T>, std::string>) {
-        Bytes size_bytes = en_bytes(t.size());
+        Bytes size_bytes = en_bytes(static_cast<Size>(t.size()));
         bytes.insert(bytes.end(), size_bytes.begin(), size_bytes.end());
         bytes.insert(bytes.end(), t.begin(), t.end());
     } else if constexpr (is_container<T>::value) {
-        Bytes size_bytes = en_bytes(t.size());
+        Bytes size_bytes = en_bytes(static_cast<Size>(t.size()));
         bytes.insert(bytes.end(), size_bytes.begin(), size_bytes.end());
         for (auto &&x : t) {
             Bytes x_bytes = en_bytes(x);
@@ -138,8 +139,8 @@ inline Bytes en_bytes(T &&t, Args... args) {
 }
 
 // === de_bytes ===
-inline void _bytes_length_check(size_t size, const Bytes &bytes, size_t offset){
-    assert_msg(size <= bytes.size() - offset, "");
+inline void _bytes_length_check(Size size, const Bytes &bytes, Size offset){
+    assert(size <= bytes.size() - offset);
 }
 
 template <typename T>
@@ -153,14 +154,14 @@ inline void container_append(T &t, typename T::value_type tail) {
 }
 
 template <typename T>
-inline void de_bytes(T &t, const Bytes &bytes, size_t &offset) {
+inline void de_bytes(T &t, const Bytes &bytes, Size &offset) {
     if constexpr (std::is_fundamental_v<T>) {
         _bytes_length_check(sizeof(T), bytes, offset);
         std::memcpy(&t, bytes.data() + offset, sizeof(T));
         offset += sizeof(T);
     } else if constexpr (std::is_same_v<T, std::string>) {
-        _bytes_length_check(sizeof(size_t), bytes, offset);
-        size_t size;
+        _bytes_length_check(sizeof(Size), bytes, offset);
+        Size size;
         de_bytes(size, bytes, offset);
         assert(size <= bytes.size() - offset);
         t.resize(size, '\0');
@@ -175,11 +176,12 @@ inline void de_bytes(T &t, const Bytes &bytes, size_t &offset) {
         de_bytes(snd, bytes, offset);
         t = {fst_copy, snd};
     } else if constexpr (is_container<T>::value) {
-        _bytes_length_check(sizeof(size_t), bytes, offset);
-        size_t size;
+        _bytes_length_check(sizeof(Size), bytes, offset);
+        Size size;
         de_bytes(size, bytes, offset);
+        assert(size >= 0);
         t.clear();
-        for (size_t i = 0; i < size; i++) {
+        for (Size i = 0; i < size; i++) {
             if constexpr (Traits::is_map_v<T>) {
                 std::remove_const_t<typename T::value_type::first_type> fst;
                 typename T::value_type::second_type snd;

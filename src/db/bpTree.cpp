@@ -11,24 +11,17 @@
 #include "cache.h"
 #include "io.h"
 
-using SDB::Const::BLOCK_SIZE;
-using SDB::Type::Bytes;
-using SDB::Type::Pos;
-using SDB::Type::PosList;
-using SDB::Type::Value;
-
-using namespace SDB;
-
+namespace sdb {
 
 // --------------- Function ---------------
 // ========== BptNode Function =========
-Value BptNode::last_key()const{
-    return (std::prev(pos_lst.end()))->first;
-}
+// Value BptNode::last_key()const{
+//     return (std::prev(pos_lst.end()))->first;
+// }
 
 // ========== BpTree Function =========
 // ---------- BpTree Public Function ---------
-BpTree::BpTree(const SDB::Type::TableProperty &table_property):table_property(table_property){
+BpTree::BpTree(const TableProperty &table_property):table_property(table_property){
     initialize();
 }
 
@@ -554,3 +547,5 @@ std::string BpTree::get_index_path(const TableProperty &property) {
 std::string BpTree::get_index_meta_path(const TableProperty &property) {
     return property.db_name + "/" + property.table_name + "/index_meta.sdb";
 }
+
+} // namespace sdb

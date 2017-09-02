@@ -85,7 +85,7 @@ void IO::append_write_file(const std::string &file_path, const Bytes &data) {
     out.close();
 }
 
-Bytes IO::read_block(const std::string &file_path, size_t block_num) {
+Block IO::read_block(const std::string &file_path, size_t block_num) {
     // mmap read
     std::string abs_path = get_db_file_path(file_path);
     int fd = open(abs_path.data(), O_RDWR);
@@ -95,18 +95,16 @@ Bytes IO::read_block(const std::string &file_path, size_t block_num) {
         write(fd, "", 1);
     }
     char *buff = (char*)mmap(nullptr, BLOCK_SIZE, PROT_READ, MAP_SHARED, fd, BLOCK_SIZE*block_num);
-    Bytes bytes(buff, buff+BLOCK_SIZE);
+    Block block;
+    std::memcpy(block.data(), buff, BLOCK_SIZE);
     munmap(buff, BLOCK_SIZE);
     close(fd);
 
-    return bytes;
+    return block;
 }
 
-void IO::write_block(const std::string &file_path, size_t block_num, const Bytes &data){
+void IO::write_block(const std::string &file_path, size_t block_num, const Block &data){
     std::string abs_path = get_db_file_path(file_path);
-    if (data.size() != BLOCK_SIZE) {
-        throw std::runtime_error("Error: data size not equal BLOCK_SIZE");
-    }
     int fd = open(abs_path.data(), O_RDWR);
     assert_msg(fd >= 0, abs_path);
     if (get_file_size(file_path) < (block_num+1)*BLOCK_SIZE) {

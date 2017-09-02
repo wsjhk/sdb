@@ -16,7 +16,7 @@ TEST(db_db_type_test, integer_object) {
 
     // bytes
     auto bytes = sdb::en_bytes(10);
-    size_t offset = 0;
+    int offset = 0;
     obj->de_bytes(bytes, offset);
     ASSERT_TRUE(obj->en_bytes() == bytes);
 

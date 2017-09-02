@@ -8,7 +8,7 @@ TEST(db_util_test, bytes) {
     // === int check
     int i = 100;
     Bytes bytes = en_bytes(i);
-    size_t offset = 0;
+    int offset = 0;
     de_bytes(i, bytes, offset);
     ASSERT_TRUE(i == 100);
 
@@ -27,7 +27,9 @@ TEST(db_util_test, bytes) {
     std::string str = "asdf";
     std::set<int> set = {1, 2, 3};
     std::unordered_map<int, int> map = {{1, 1}, {2, 2}};
+    std::cout << en_bytes(str).size() << std::endl;
     Bytes mul_bytes = en_bytes(str, set, map);
+    std::cout << mul_bytes.size() << std::endl;
     std::string new_str;
     std::set<int> new_set;
     std::unordered_map<int, int> new_map;

@@ -29,7 +29,7 @@ ColProperty ColProperty::de_bytes(const Bytes &bytes, Size &offset){
 }
 
 // === TableProperty === 
-size_t TableProperty::get_col_property_pos(const std::string &col_name)const{
+Size TableProperty::get_col_property_pos(const std::string &col_name)const{
     auto f = [col_name](auto &&cp)->bool{return cp.col_name == col_name;};
     std::find_if(col_property_lst.begin(), col_property_lst.end(), f);
 }
@@ -40,6 +40,11 @@ std::vector<std::string> TableProperty::get_col_name_lst()const{
         ret.push_back(x.col_name);
     }
     return ret;
+}
+
+ColProperty TableProperty::get_key_property()const {
+    Size pos = get_col_property_pos(key);
+    return col_property_lst[pos];
 }
 
 } // SDB::Function namespace about

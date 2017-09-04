@@ -34,6 +34,12 @@ using BlockOffset = Size;
 using Byte = char;
 using Bytes = std::vector<Byte>;
 
+// functional
+class Object;
+using ObjPred = std::function<bool(std::shared_ptr<const Object>)>;
+// using ObjMap = std::function<std::shared_ptr<Object>(std::shared_ptr<const Object>)>;
+// using ObjInplaceMap = std::function<void(std::shared_ptr<Object>)>;
+
 // traits
 namespace Traits {
     // pair
@@ -96,6 +102,8 @@ namespace Traits {
     template<typename T>
     constexpr bool is_map_v = MapTraits<T>::value || UMapTraits<T>::value;
 
+    template <typename T>
+    constexpr bool is_obj_v = std::is_same_v<std::shared_ptr<Object>, T> || std::is_same_v<std::shared_ptr<const Object>, T>;
 } // SDB::Taits namespace
 
 using boost::spirit::traits::is_container;
@@ -107,6 +115,8 @@ inline Bytes en_bytes(T t) {
         Bytes size_bytes = en_bytes(static_cast<Size>(t.size()));
         bytes.insert(bytes.end(), size_bytes.begin(), size_bytes.end());
         bytes.insert(bytes.end(), t.begin(), t.end());
+    } else if constexpr (Traits::is_obj_v<T>) {
+        return t->en_bytes();
     } else if constexpr (is_container<T>::value) {
         Bytes size_bytes = en_bytes(static_cast<Size>(t.size()));
         bytes.insert(bytes.end(), size_bytes.begin(), size_bytes.end());
@@ -196,6 +206,12 @@ inline void de_bytes(T &t, const Bytes &bytes, Size &offset) {
     } else {
         static_assert(Traits::always_false<T>::value);
     }
+}
+
+template <typename ...Args>
+inline void bytes_append(Bytes &bytes, Args... args) {
+    Bytes append_bytes = en_bytes(args...);
+    bytes.insert(bytes.end(), append_bytes.begin(), append_bytes.end());
 }
 
 } // SDB namespace

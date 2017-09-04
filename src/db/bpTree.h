@@ -1,13 +1,13 @@
-#ifndef BPTREE_H
-#define BPTREE_H
+#ifndef DB_BPTREE_H
+#define DB_BPTREE_H
 
 #include <memory>
 #include <list>
 #include <stdexcept>
 #include <iostream>
 #include <string>
-#include <boost/variant.hpp>
 #include <functional>
+#include <mutex>
 
 #include "util.h"
 #include "db_type.h"
@@ -16,82 +16,70 @@
 
 namespace sdb {
 
+// b-link tree
 struct BptNode {
-    // type
-    std::list<std::pair<DBType::ObjPtr, Pos>> pos_lst;
+    // menber
     bool is_leaf = true;
-    bool is_new_node = true;
-    // Pos end_pos = 0;
-    Pos right_node_pos = 0;
-    Pos file_pos = 0;
+    BlockNum right_node_pos = -1;
+    BlockNum file_pos = -1;
+    Size bytes_size = 0;
 
-    // === 节点操作 ===
-    // 获取节点最后的key
+    std::vector<db_type::ObjCntPtr> key_lst;
+    std::vector<BlockNum> pos_lst;
+
+    // read by cache
+    static BptNode get(const TableProperty &table_property, BlockNum pos);
+    
+    // TODO impl
+    void reset_bytes_size();
+    // get
+    bool is_full()const;
+
+    // sync to cache
+    void sync()const;
+
+    // return right pos
+    BlockNum split();
+
+private:
+    const TableProperty tp;
+    BptNode(const TableProperty &tp):tp(tp){}
 };
 
 class BpTree {
 public:
     // === type ===
-    using nodePtrType = std::shared_ptr<BptNode>;
+    using nodePtr = std::shared_ptr<BptNode>;
+    using ObjCntPtr = db_type::ObjCntPtr;
 
     BpTree()= delete;
-    BpTree(const TableProperty &table_property);
-    // 禁止树的复制，防止文件读写不一致
+    BpTree(const TableProperty &table_property):table_property(table_property){}
     BpTree(const BpTree &bpt)= delete;
     BpTree(BpTree &&bpt)= delete;
     const BpTree &operator=(const BpTree &bpt)= delete;
     BpTree &operator=(BpTree &&bpt)= delete;
     ~BpTree();
 
-    static void create(const TableProperty &property);
-    static void drop(const TableProperty &property);
-
-    void clear();
-    void write_info_block();
-
-    nodePtrType read(SDB::Type::Pos pos) const;
-    void write(nodePtrType ptr);
+    static void get(const TableProperty &property);
+    // static void drop(const TableProperty &property);
 
     // sql
-    void insert(const Value &key, const Bytes &data);
-    void remove(const Value &key);
-    void update(const Value &key, const Bytes &data);
-    PosList find(const Value &key)const;
-    PosList find(const Value &mid, bool is_less)const;
-    PosList find(const Value &beg, const Value &end)const;
-    PosList find(std::function<bool(Value)> predicate) const;
+    void insert(ObjCntPtr key, const Tuple &tuple);
+    void remove(ObjCntPtr key);
+    void update(ObjCntPtr key, const Bytes &data);
+    Tuples find(ObjCntPtr key)const;
+    Tuples find(ObjCntPtr mid, bool is_less)const;
+    Tuples find(ObjCntPtr beg, ObjCntPtr end)const;
+    Tuples find(ObjPred pred) const;
 
     // debug log
     void print()const;
 
 private:
-    void initialize();
-
-    bool is_node_less(nodePtrType ptr)const;
-    // 分裂节点
-    nodePtrType node_split(nodePtrType &ptr);
-    // 合并节点
-    bool node_merge(nodePtrType &ptr_1, nodePtrType &ptr_2);
-
-    // 递归插入
-    nodePtrType insert_r(const Value &key, const Bytes &data, nodePtrType ptr);
-    // 递归删除
-    bool remove_r(const Value &key, nodePtrType &ptr);
-    // find_near_key_node
-    nodePtrType find_near_key_node(const Value &key)const;
-    nodePosLstType::const_iterator get_pos_lst_iter(const Value &key, const nodePosLstType &pos_lst) const;
-    nodePtrType get_leaf_begin_node()const;
-    nodePtrType get_leaf_end_node()const;
-    void pos_lst_insert(PosList &pos_lst,
-                        nodePosLstType::const_iterator beg_iter,
-                        nodePosLstType::const_iterator end_iter)const;
-    void pos_lst_insert(PosList &pos_lst,
-                        nodePosLstType::const_iterator beg_iter,
-                        nodePosLstType::const_iterator end_iter,
-                        std::function<bool(Value)> predicate)const;
+    std::vector<BlockNum> search_path(ObjCntPtr key)const;
+    BlockNum search_reocrd_pos(ObjCntPtr key)const;
     // get
-    static std::string get_index_path(const TableProperty &property);
-    static std::string get_index_meta_path(const TableProperty &property);
+    std::string index_path()const;
 
     // === 异常处理 ===
     void throw_error(const std::string &str)const{
@@ -99,14 +87,12 @@ private:
     }
 
 private:
-//    nodePtrType root;
-    Pos root_pos;
-    SDB::Type::PosList free_pos_list;
-    Pos free_end_pos;
-    size_t node_key_count;
-    SDB::Type::TableProperty table_property;
+    const TableProperty table_property;
+    // TODO concurrent map
+    std::unordered_map<BlockNum, std::mutex> map;
+    // std::mutex global_mutex;
 };
 
 } // namespace sdb
 
-#endif /* BPTREE_H */
+#endif /* DB_BPTREE_H */

@@ -36,6 +36,9 @@ public:
 
     // get
     bool has_file(const std::string &str);
+    static std::string get_block_path(const std::string &db_name) {
+        return db_name + "/block.sdb";
+    }
 
 private:
     // private function

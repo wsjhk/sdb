@@ -44,6 +44,7 @@ struct TableProperty {
     std::string db_name;
     std::string table_name;
     std::string key;
+    BlockNum key_index_root;
     ColPropertyList col_property_lst;
     // integrity
     // <table_name, col_name>
@@ -51,16 +52,18 @@ struct TableProperty {
     // <table_name, col_name>
     std::unordered_map<std::string, std::string> referenced_map;
 
-    TableProperty(){}
+    // TableProperty(){}
     TableProperty(const std::string &db_name,
                   const std::string &table_name,
                   const std::string &key,
+                  BlockNum key_index_root,
                   const ColPropertyList &col_property_lst)
-            :db_name(db_name), table_name(table_name), key(key), col_property_lst(col_property_lst){}
+            :db_name(db_name), table_name(table_name), key(key), key_index_root(key_index_root), col_property_lst(col_property_lst){}
 
     // getter
-    size_t get_col_property_pos(const std::string &col_name)const;
+    Size get_col_property_pos(const std::string &col_name)const;
     std::vector<std::string> get_col_name_lst()const;
+    ColProperty get_key_property()const;
 };
 
 } // namespace sdb

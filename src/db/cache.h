@@ -86,7 +86,7 @@ private:
 
 class CacheMaster {
 public:
-    static BlockCache &get_misc_cache() {
+    static BlockCache &get_block_cache() {
         static BlockCache cache(100);
         return cache;
     }

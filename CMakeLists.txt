@@ -20,4 +20,4 @@ file(GLOB DB_TEST_SOURCES_FILES test/db/*.cpp)
 file(GLOB DB_SOURCES_FILES src/db/io.cpp src/db/cache.cpp src/db/block_alloc.cpp src/db/tuple.cpp src/db/db_type.cpp)
 
 add_executable(sdb_test test/Main.cpp ${DB_TEST_SOURCES_FILES} ${DB_SOURCES_FILES})
-target_link_libraries(sdb_test ${GTEST_BOTH_LIBRARIES} -lstdc++fs -ltbb)
+target_link_libraries(sdb_test ${GTEST_BOTH_LIBRARIES} -lstdc++fs)

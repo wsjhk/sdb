@@ -19,7 +19,7 @@ public:
     explicit Record(TableProperty, BlockNum);
 
     bool is_less()const;
-    bool is_overflow()const;
+    bool is_full()const;
 
     Record split();
     void merge(Record &&record);
@@ -32,11 +32,12 @@ public:
     void sync() const;
 
     // create and drop
-    static Record create(const TableProperty &table_property);
+    static Record create(const TableProperty &table_property, BlockNum next_record_num);
 
 private:
     TableProperty tp;
     const BlockNum block_num;
+    BlockNum next_record_num;
     BlockOffset offset;
     Tuples tuples;
 };

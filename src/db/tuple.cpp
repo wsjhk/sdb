@@ -7,117 +7,122 @@ namespace sdb {
 using db_type::ObjPtr;
 using db_type::ObjCntPtr;
 
-Tuples::Tuples(const Tuples &tuples):col_num(tuples.col_num){
-    *this = tuples;
-}
-
-Tuples::Tuples(Tuples &&tuples):col_num(tuples.col_num) {
-    *this = std::move(tuples);
-}
-
-Tuples &Tuples::operator=(const Tuples &tuples) {
-    for (auto &&tuple : tuples.data) {
-        data.push_back(tuple_clone(tuple));
+// ========== tuple =========
+Tuple &Tuple::operator=(const Tuple &tuple) {
+    // deepin copy
+    for (auto &ptr : tuple.data) {
+        data.push_back(ptr->clone());
     }
 }
 
-Tuples &Tuples::operator=(Tuples &&tuples) {
-    data = std::move(tuples.data);
-}
-
-// tuple
-std::vector<ObjPtr> Tuples::tuple_clone(const std::vector<db_type::ObjPtr> &tuple) {
-    std::vector<ObjPtr> ret;
-    for (auto && ptr : tuple) {
-        ret.push_back(ptr->clone());
+Tuple &Tuple::operator=(Tuple &&tuple) {
+    // simple copy
+    data = tuple.data;
+    for (ObjPtr &ptr : tuple.data) {
+        ptr = nullptr;
     }
-    return ret;
 }
 
-Size Tuples::tuple_type_size(const Tuple &tuple) {
-    Size sum;
-    for (auto &&ptr : tuple) {
+Size Tuple::type_size()const {
+    Size sum = 0;
+    for (auto &&ptr : data) {
         sum += ptr->get_type_size();
     }
     return sum;
 }
 
+bool Tuple::eq(const Tuple &tuple)const{
+    if (data.size() != tuple.data.size()) return false;
+
+    // deepin compare
+    for (size_t i = 0; i < data.size(); i++) {
+        if (!data[i]->eq(tuple.data[i])) return false;
+    }
+    return true;
+}
+
+// bytes
+Bytes Tuple::en_bytes()const {
+    return sdb::en_bytes(data);
+}
+
+void Tuple::de_bytes(const std::vector<std::pair<db_type::TypeTag, int>> &tag_sizes, const Bytes &bytes, Size offset) {
+    for (auto &&[tag, size] : tag_sizes) {
+        ObjPtr ptr = db_type::get_default(tag, size);
+        ptr->de_bytes(bytes, offset);
+        data.push_back(ptr);
+    }
+}
+
+// ========== tuples =========
 // map
 Tuples Tuples::map(std::function<db_type::ObjPtr(db_type::ObjCntPtr)> op, int col_offset)const {
-    assert(col_offset >= 0);
+    assert(col_offset >= 0 && col_offset < col_num);
     Tuples tuples(col_num);
     for (auto &&tuple : data) {
-        std::vector<ObjPtr> tuple_copy = tuple_clone(tuple);
+        Tuple tuple_copy = tuple;
         tuple_copy[col_offset] = op(tuple[col_offset]);
         tuples.data.push_back(tuple_copy);
     }
     return tuples;
 }
 
-void Tuples::invaded_map(std::function<void(db_type::ObjPtr)> op, int col_offset) {
-    assert(col_offset >= 0);
-    for (auto &&lst : data) {
-        op(lst[col_offset]);
+void Tuples::inplace_map(std::function<void(db_type::ObjPtr)> op, int col_offset) {
+    assert(col_offset >= 0 && col_offset < col_num);
+    for (auto &&tuple : data) {
+        op(tuple[col_offset]);
     }
 }
 
 // filter
 Tuples Tuples::filter(std::function<bool(db_type::ObjCntPtr)> pred, int col_offset)const {
-    assert(col_offset >= 0);
+    assert(col_offset >= 0 && col_offset < col_num);
     Tuples tuples(col_num);
     for (auto &&tuple: data) {
         if (pred(tuple[col_offset])) {
-            tuples.data.push_back(tuple_clone(tuple));
+            tuples.data.push_back(tuple);
         }
     }
     return tuples;
 }
 
-void Tuples::invaded_filter(std::function<bool(db_type::ObjCntPtr)> pred, int col_offset) {
-    assert(col_offset >= 0);
+void Tuples::inplace_filter(std::function<bool(db_type::ObjCntPtr)> pred, int col_offset) {
+    assert(col_offset >= 0 && col_offset < col_num);
     for (auto it = data.begin(); it != data.end(); it++) {
-        if (pred(it->at(col_offset))) {
+        if (pred((*it)[col_offset])) {
             it = std::prev(data.erase(it));
         }
     }
 }
 
 // range
-void Tuples::range(std::function<void(std::vector<db_type::ObjPtr>)> fn) {
+void Tuples::range(std::function<void(Tuple)> fn) {
     for (auto && tuple : data) {
         fn(tuple);
     }
 }
 
-void Tuples::range(int beg, int len, std::function<void(std::vector<db_type::ObjPtr>)> fn) {
-    if (beg < 0) beg = 0;
-    for (int i = beg; i < data.size() || i < len; i++) {
+void Tuples::range(size_t beg, size_t len, std::function<void(Tuple)> fn) {
+    for (size_t i = beg; i < data.size() && i < len; i++) {
         fn(data[i]);
     }
 }
 
 // bytes
 Bytes Tuples::en_bytes()const {
-    Bytes bytes;
-    for (auto &&tuple : data) {
-        for (auto && ptr : tuple) {
-            Bytes obj_bytes = ptr->en_bytes();
-            bytes.insert(bytes.end(), obj_bytes.begin(), obj_bytes.end());
-        }
-    }
+    return sdb::en_bytes(data);
 }
 
-void Tuples::de_bytes(const std::vector<std::pair<db_type::TypeTag, int>> &tag_sizes,const Bytes &bytes, int &offset) {
+void Tuples::de_bytes(const std::vector<std::pair<db_type::TypeTag, int>> &tag_sizes, const Bytes &bytes, int &offset) {
+    assert(tag_sizes.size() == col_num);
+    data.clear();
     int len;
     sdb::de_bytes(len, bytes, offset);
     assert(len >= 0 || len < BLOCK_SIZE);
     for (int i = 0; i < len; i++) {
-        std::vector<ObjPtr> ptrs;
-        for (auto &&[tag, size]: tag_sizes) {
-            ObjPtr ptr = db_type::get_default(tag, size);
-            ptr->de_bytes(bytes, offset);
-        }
-        data.push_back(ptrs);
+        Tuple tuple;
+        tuple.de_bytes(tag_sizes, bytes, offset);
+        data.push_back(std::move(tuple));
     }
 }
 

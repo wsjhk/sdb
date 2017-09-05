@@ -23,10 +23,16 @@ public:
 
     Record split();
     void merge(Record &&record);
+    
+    // === sql ===
+    // return new block num if split
+    std::optional<BlockNum> insert(const Tuple &key, const Tuple &data);
+    // return if remove min key
+    std::optional<Tuple> remove(const Tuple &key, const Tuple &data);
 
     // tuple
-    void push_tuple(const Tuples::Tuple &tuple);
-    void push_tuple(Tuples::Tuple &&tuple);
+    void push_tuple(const Tuple &tuple);
+    void push_tuple(Tuple &&tuple);
 
     // sync
     void sync() const;

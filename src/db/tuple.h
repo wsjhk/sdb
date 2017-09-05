@@ -25,9 +25,11 @@ public:
     }
 
     Size type_size()const;
+    Size data_size()const;
 
     // compare
     bool eq(const Tuple &tuple)const;
+    bool less(const Tuple &tuple)const;
 
     // bytes
     Bytes en_bytes()const;
@@ -39,6 +41,12 @@ public:
     }
     void push_back(db_type::ObjPtr &&ptr){
         data.push_back(ptr);
+    }
+
+    void range(db_type::ObjCntOp op) const {
+        for (db_type::ObjCntPtr ptr : data) {
+            op(ptr);
+        }
     }
 
 private:
@@ -76,6 +84,11 @@ struct Tuples {
     // debug
     void print()const;
 };
+
+template <>
+inline Bytes en_bytes(Tuple tuple) {
+    return tuple.en_bytes();
+}
 
 } // namespace sdb
 

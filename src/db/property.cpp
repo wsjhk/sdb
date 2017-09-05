@@ -42,9 +42,13 @@ std::vector<std::string> TableProperty::get_col_name_lst()const{
     return ret;
 }
 
-ColProperty TableProperty::get_key_property()const {
-    Size pos = get_col_property_pos(key);
-    return col_property_lst[pos];
+TableProperty::ColPropertyList TableProperty::get_keys_property()const {
+    ColPropertyList cps;
+    for (auto &&x : keys) {
+        auto pos = get_col_property_pos(x);
+        cps.push_back(col_property_lst[pos]);
+    }
+    return cps;
 }
 
 } // SDB::Function namespace about

@@ -31,6 +31,14 @@ Size Tuple::type_size()const {
     return sum;
 }
 
+Size Tuple::data_size()const {
+    Size sum = 0;
+    for (auto &&ptr : data) {
+        sum += ptr->get_size();
+    }
+    return sum;
+}
+
 bool Tuple::eq(const Tuple &tuple)const{
     if (data.size() != tuple.data.size()) return false;
 
@@ -39,6 +47,18 @@ bool Tuple::eq(const Tuple &tuple)const{
         if (!data[i]->eq(tuple.data[i])) return false;
     }
     return true;
+}
+
+bool Tuple::less(const Tuple &tuple)const {
+    if (data.size() != tuple.data.size()) return false;
+    // deepin compare
+    for (size_t i = 0; i < data.size(); i++) {
+        if (data[i]->eq(tuple.data[i])) {
+            continue;
+        }
+        return data[i]->eq(tuple.data[i]);
+    }
+    return false;
 }
 
 // bytes

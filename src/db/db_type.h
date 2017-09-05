@@ -63,6 +63,7 @@ public:
     virtual TypeTag get_type_tag()const =0;
     virtual std::string get_type_name()const =0;
     virtual int get_type_size()const =0;
+    virtual int get_size()const =0;
 
     // show
     virtual std::string to_string()const =0;
@@ -85,12 +86,19 @@ public:
 // object alias
 using ObjPtr = SP<Object>;
 using ObjCntPtr = SP<const Object>;
+// functional
+using ObjPred = std::function<bool(std::shared_ptr<const Object>)>;
+// using ObjMap = std::function<std::shared_ptr<Object>(std::shared_ptr<const Object>)>;
+// using ObjInplaceMap = std::function<void(std::shared_ptr<Object>)>;
+using ObjCntOp = std::function<void(std::shared_ptr<const Object>)>;
+
 
 // ===== Null =====
 struct None : public Object {
     TypeTag get_type_tag()const override {return NONE;}
     std::string get_type_name()const override {return "null";}
     int get_type_size()const override {return 0;}
+    int get_size()const override {return 0;}
 
     // show
     std::string to_string()const override {return "null";}
@@ -131,6 +139,7 @@ public:
     TypeTag get_type_tag()const override;
     std::string get_type_name()const override;
     int get_type_size()const override {return sizeof(T);};
+    int get_size()const override {return sizeof(T);};
     
     // show
     std::string to_string()const override {
@@ -178,6 +187,8 @@ public:
     String()=default;
     String(const std::string &data):data(data){}
 
+    int get_size()const override {return data.size();}
+
     // show
     std::string to_string()const override{return data;}
 
@@ -222,7 +233,7 @@ public:
     // type
     TypeTag get_type_tag()const override { return VARCHAR; }
     std::string get_type_name()const override { return "varchar"; }
-    int get_type_size()const override { return data.size(); }
+    int get_type_size()const override { return max_size; }
 
     // clone
     std::shared_ptr<Object> clone()const override {
@@ -371,7 +382,15 @@ void Integer<T>::assign(SP<const Object> obj) {
     }
 }
 
+} // sdb::db_types namespace
 
-} // sdb::DBType namespace
+namespace sdb {
+    template <>
+    inline Bytes en_bytes(db_type::ObjCntPtr ptr) {
+        return ptr->en_bytes();
+    }
+}
+
+
 
 #endif /* ifndef DB_TYPE */

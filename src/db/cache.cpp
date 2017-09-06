@@ -78,7 +78,7 @@ void BlockCache::sync() {
     mutex.unlock();
 }
 
-auto BlockCache::sync(const std::string &path, size_t block_num) {
+void BlockCache::sync(const std::string &path, Size block_num) {
     mutex.lock();
     auto it = key_map.find(encode_key(path, block_num));
     IO::get().write_block(path, block_num, *it->second->ptr);

@@ -18,13 +18,101 @@ using db_type::ObjCntPtr;
 
 // --------------- Function ---------------
 // ========== BpTree Function =========
+void BpTree::insert(const Tuple &key, const Tuple &data) {
+    auto lst = search_path(key);
+    BlockNum record_pos = lst.back();
+    Record record(tp, record_pos);
+    auto res = record.insert(key, data);
+    if (!res.has_value()) return;
+
+    bubble_split(std::move(lst), key, res.value());
+}
+
+// remove record only, 
+// we don't delete record block though block is empty,
+// so B+Tree node don't need merge
+void BpTree::remove(const Tuple &key) {
+    auto lst = search_path(key);
+    auto record_pos = lst.back();
+    Record record(tp, record_pos);
+    record.remove(key);
+}
+
+void BpTree::update(const Tuple &key, const Tuple &data) {
+    auto lst = search_path(key);
+    auto record_pos = lst.back();
+    lst.pop_back();
+    Record record(tp, record_pos);
+    std::optional<BlockNum> res = record.update(key, data);
+    if (!res.has_value()) return;
+
+    bubble_split(std::move(lst), key, res.value());
+}
+
+Tuples BpTree::find_key(const Tuple &key)const {
+    auto lst = search_path(key);
+    Record record(tp, lst.back());
+    return record.find_key(key);
+}
+
+Tuples BpTree::find_less(const Tuple &key, bool is_close)const {
+    Tuples ts(tp.col_property_lst.size());
+    auto mid_pos = search_path(key).back();
+    BlockNum min_pos = search_min_reocrd_pos();
+    Record record(tp, min_pos);
+    while (record.get_block_num() != mid_pos) {
+        ts.append(record.get_all_tuple());
+        record = Record(tp, record.get_block_num());
+    }
+    ts.append(record.find_less(key, is_close));
+    return ts;
+}
+
+Tuples BpTree::find_greater(const Tuple &key, bool is_close)const {
+    Tuples ts(tp.col_property_lst.size());
+    auto pos = search_path(key).back();
+    Record record(tp, pos);
+    ts.append(record.find_greater(key, is_close));
+    while (record.get_next_record_num() != -1) {
+        assert(record.get_next_record_num() != -1);
+        record = Record(tp, record.get_block_num());
+        ts.append(record.get_all_tuple());
+    }
+    return ts;
+}
+
+Tuples BpTree::find_range(const Tuple &beg, const Tuple &end, bool is_beg_close, bool is_end_close)const {
+    assert(beg <= end);
+
+    Tuples ts(tp.col_property_lst.size());
+    auto beg_pos = search_path(beg).back();
+    auto end_pos = search_path(end).back();
+    Record record(tp, beg_pos);
+    if (beg_pos == end_pos) {
+        return record.find_range(beg, end, is_beg_close, is_end_close);
+    }
+
+    // being block
+    ts.append(record.find_greater(beg, is_beg_close));
+    record = Record(tp, record.get_block_num());
+    // inter block
+    while (record.get_block_num() != end_pos) {
+        assert(record.get_next_record_num() != -1);
+        ts.append(record.get_all_tuple());
+        record = Record(tp, record.get_block_num());
+    }
+    // end block
+    ts.append(record.find_less(end, is_end_close));
+}
+
+//  === BpTree private function ===
 std::string BpTree::index_path()const {
     return tp.db_name + "/block.sdb";
 }
 
-std::vector<BlockNum> BpTree::search_path(Tuple key)const {
+std::vector<BlockNum> BpTree::search_path(const Tuple &key)const {
     std::vector<BlockNum> lst;
-    BptNode node = BptNode::get(tp, tp.keys_index_root);
+    BptNode node = BptNode::get(tp, root_pos);
     while (true) {
         lst.push_back(node.file_pos);
         auto [key_it, pos_it] = node.search_less_or_eq_key(key);
@@ -39,34 +127,45 @@ std::vector<BlockNum> BpTree::search_path(Tuple key)const {
     }
 }
 
-void BpTree::insert(const Tuple &key, const Tuple &data) {
-    auto lst = search_path(key);
-    BlockNum record_pos = lst.back();
-    Record record(tp, record_pos);
-    auto res = record.insert(key, data);
-    if (!res.has_value()) return;
+BlockNum BpTree::search_min_reocrd_pos()const{
+    BptNode node = BptNode::get(tp, root_pos);
+    while (!node.is_leaf) {
+        node = BptNode::get(tp, node.pos_lst.front());
+    }
+    return node.pos_lst.front();
+}
 
-    BlockNum insert_pos = res.value();
-    lst.pop_back();
+void BpTree::bubble_split(std::vector<BlockNum> &&lst, const Tuple &key, BlockNum record_pos) {
+    BlockNum insert_pos = record_pos;
+    mutex_map[insert_pos].lock();
     BptNode node = BptNode::get(tp, lst.back());
     while (true) {
         auto &&[key_it, pos_it] = node.search_less_or_eq_key(key);
         node.key_lst.insert(std::next(key_it), key);
         node.pos_lst.insert(std::next(pos_it), insert_pos);
         if (node.is_full()) {
-            auto [insert_pos, min_key] = node.split();
-            if (node.file_pos == tp.keys_index_root) {
-                BptNode new_node = BptNode::new_node(tp);
-                new_node.is_leaf = false;
-                new_node.key_lst.push_back(min_key);
-                new_node.pos_lst.push_back(node.file_pos);
-                new_node.pos_lst.push_back(insert_pos);
-                new_node.sync();
-                // TODO 
-                // lock global B+tree and reset root pos;
+            // split and sync 
+            auto [right_node_pos, min_key] = node.split();
+            if (node.file_pos == root_pos) {
+                BptNode root_node = BptNode::new_node(tp);
+                root_node.is_leaf = false;
+                root_node.key_lst.push_back(min_key);
+                root_node.pos_lst.push_back(node.file_pos);
+                root_node.pos_lst.push_back(right_node_pos);
+                root_node.sync();
+                root_pos = root_node.file_pos;
+                mutex_map[node.file_pos].unlock();
+                return;
             }
             lst.pop_back();
+            mutex_map[insert_pos].unlock();
+            insert_pos = right_node_pos;
+            mutex_map[lst.back()].lock();
             node = BptNode::get(tp, lst.back());
+        } else {
+            node.sync();
+            mutex_map[insert_pos].unlock();
+            return;
         }
     }
 }
@@ -77,6 +176,7 @@ void BpTree::insert(const Tuple &key, const Tuple &data) {
 BpTree::BptNode BpTree::BptNode::get(const TableProperty &tp, BlockNum pos) {
     std::string path = IO::get_block_path(tp.db_name);
     Bytes bytes = CacheMaster::get_block_cache().get(path, pos);
+
     BptNode node(tp);
     Size offset = 0;
     sdb::de_bytes(node.is_leaf, bytes, offset);
@@ -88,20 +188,12 @@ BpTree::BptNode BpTree::BptNode::get(const TableProperty &tp, BlockNum pos) {
     auto cps = tp.get_keys_property();
     for (int i = 0; i < size; i++) {
         Tuple keys;
-        if (node.is_single_key()) {
-            // single-key
-            ObjPtr key = db_type::get_default(cps[0].col_type, cps[0].type_size);
+        for (auto &&cp : cps) {
+            ObjPtr key = db_type::get_default(cp.col_type, cps[0].type_size);
             key->de_bytes(bytes, offset);
             keys.push_back(key);
-            node.key_lst.push_back(keys);
-        } else {
-            // multi-key
-            std::vector<std::pair<db_type::TypeTag, Size>> tag_sizes;
-            for (auto &&cp : cps) {
-                tag_sizes.push_back({cp.col_type, cp.type_size});
-            }
-            keys.de_bytes(tag_sizes, bytes, offset);
         }
+        node.key_lst.push_back(keys);
     }
     sdb::de_bytes(node.pos_lst, bytes, offset);
     return node;
@@ -157,17 +249,13 @@ BpTree::BptNode::search_less_or_eq_key(Tuple key) {
 void BpTree::BptNode::sync() {
     assert(!is_full());
     assert(file_pos != -1);
-    // reset_bytes_size();
 
     // node block bytes:
     //     |is_leaf right_node_pos key_lst pos_lst|
     Bytes bytes = sdb::en_bytes(is_leaf, right_node_pos);
-    if (is_single_key()) {
-        for (auto &&key : key_lst) {
-            bytes_append(bytes, key[0]);
-        }
-    } else {
-        bytes_append(bytes, key_lst);
+    bytes_append(bytes, key_lst);
+    for (auto &&key: key_lst) {
+        key.range([&bytes](auto &&ptr){bytes_append(bytes, ptr);});
     }
     bytes_append(bytes, pos_lst);
     bytes.resize(BLOCK_SIZE);
@@ -185,6 +273,7 @@ std::pair<BlockNum, Tuple> BpTree::BptNode::split() {
     // reset right node pos
     new_node.right_node_pos = right_node_pos;
     right_node_pos = new_pos;
+    // pass new pos
     new_node.file_pos = new_pos;
 
     // split key list

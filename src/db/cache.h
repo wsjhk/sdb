@@ -57,7 +57,7 @@ public:
     // sync file
     // auto sync(const std::string &path);
     // sync block
-    auto sync(const std::string &path, size_t block_num);
+    void sync(const std::string &path, Size block_num);
 
     // for test
     ValueList _value_list()const {

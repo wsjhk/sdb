@@ -19,13 +19,10 @@ public:
         assert(size >= 0 && size <= data.size());
         return data[size];
     }
-    db_type::ObjCntPtr operator[](Size size) const {
-        assert(size >= 0 && size <= data.size());
-        return data[size];
-    }
 
     Size type_size()const;
-    Size data_size()const;
+    Size data_bytes_size()const;
+    Size len()const { return data.size(); }
 
     // compare
     bool eq(const Tuple &tuple)const;
@@ -53,17 +50,10 @@ private:
     std::vector<db_type::ObjPtr> data;
 };
 
-struct Tuples {
-    // member
-    const int col_num;
-    std::vector<Tuple> data;
-
+class Tuples {
+public:
     // constructor
-    Tuples(int col_num):col_num(col_num){}
-    Tuples(const Tuples &)=default;
-    Tuples(Tuples &&)=default;
-    Tuples &operator=(const Tuples &)=default;
-    Tuples &operator=(Tuples &&)=default;
+    Tuples(Size col_num):col_num(col_num){}
 
     // map
     Tuples map(std::function<db_type::ObjPtr(db_type::ObjCntPtr)> op, int col_offset)const;
@@ -77,12 +67,29 @@ struct Tuples {
     void range(std::function<void(Tuple)> fn);
     void range(size_t beg, size_t offset, std::function<void(Tuple)> fn);
 
+    // append
+    void append(const Tuples &tuples) {
+        assert(tuple.len() == col_num);
+        data.insert(data.end(), tuples.data.begin(), tuples.data.end());
+    }
+
+    // push
+    void push_back(const Tuple &tuple) {
+        assert(tuple.len() == col_num);
+        data.push_back(tuple);
+    }
+
     // bytes
     Bytes en_bytes()const;
     void de_bytes(const std::vector<std::pair<db_type::TypeTag, int>> &type_tags,const Bytes &bytes, int &offset) ;
 
     // debug
     void print()const;
+
+public:
+    std::vector<Tuple> data;
+private:
+    Size col_num;
 };
 
 template <>

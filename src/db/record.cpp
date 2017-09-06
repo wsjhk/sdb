@@ -8,10 +8,11 @@
 
 namespace sdb {
 
-Record::Record(TableProperty table_property, BlockNum bn):tp(table_property), block_num(bn), offset(0), tuples(0) {
+Record::Record(TableProperty table_property, BlockNum bn):tp(table_property), block_num(bn), tuples(tp.col_property_lst.size()) {
     IO &io = IO::get();
     Bytes bytes = io.read_block(tp.db_name+"/block.sdb", bn);
     // read next record num
+    Size offset = 0;
     sdb::de_bytes(next_record_num, bytes, offset);
     // read tuples
     std::vector<std::pair<db_type::TypeTag, int>> tag_sizes;
@@ -23,11 +24,11 @@ Record::Record(TableProperty table_property, BlockNum bn):tp(table_property), bl
 }
 
 bool Record::is_less()const {
-    return offset < BLOCK_SIZE / 2;
+    return get_bytes_size() < BLOCK_SIZE / 2;
 }
 
 bool Record::is_full() const {
-    return offset > BLOCK_SIZE;
+    return get_bytes_size() > BLOCK_SIZE;
 }
 
 Record Record::split() {
@@ -41,7 +42,6 @@ Record Record::split() {
     // move tuples
     size_t len = tuples.data.size() / 2;
     for (size_t i = len; i < tuples.data.size(); i++) {
-        offset -= Tuples::tuple_type_size(tuples.data[i]);
         record.push_tuple(std::move(tuples.data[i]));
     }
     tuples.data.erase(tuples.data.begin()+len, tuples.data.end());
@@ -50,24 +50,17 @@ Record Record::split() {
 
 void Record::merge(Record &&record) {
     for (auto && tuple : tuples.data) {
-        offset += Tuples::tuple_type_size(tuple);
         record.push_tuple(std::move(tuple));
     }
     next_record_num = record.next_record_num;
 }
 
-// tuple
-void Record::push_tuple(const Tuples::Tuple &tuple) {
-    offset -= Tuples::tuple_type_size(tuple);
-    tuples.data.push_back(Tuples::tuple_clone(tuple));
+void Record::sync_disk() const {
+    sync_cache();
+    CacheMaster::get_block_cache().sync(block_path(), block_num);
 }
 
-void Record::push_tuple(Tuples::Tuple &&tuple) {
-    offset -= Tuples::tuple_type_size(tuple);
-    tuples.data.push_back(tuple);
-}
-
-void Record::sync() const {
+void Record::sync_cache() const {
     std::string path = tp.db_name + "/block.sdb";
     // next record num
     Bytes bytes = sdb::en_bytes(next_record_num);
@@ -76,13 +69,21 @@ void Record::sync() const {
     bytes.insert(bytes.end(), tuples_bytes.begin(), tuples_bytes.end());
     assert(bytes.size() <= BLOCK_SIZE);
     bytes.resize(BLOCK_SIZE);
-    CacheMaster::get_misc_cache().put(path, block_num, bytes);
+    CacheMaster::get_block_cache().put(path, block_num, bytes);
 }
 
 Record Record::create(const TableProperty &table_property, BlockNum next_record_num) {
     BlockNum new_bn = BlockAlloc::get().new_block(table_property.db_name);
     Record record(table_property, new_bn);
     record.next_record_num = next_record_num;
+}
+
+Size Record::get_bytes_size()const {
+    Size size = sizeof(next_record_num);
+    for (auto &&t : tuples.data) {
+        size += t.data_bytes_size();
+    }
+    return size;
 }
 
 } // namespace sdb

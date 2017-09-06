@@ -27,24 +27,43 @@ public:
     // === sql ===
     // return new block num if split
     std::optional<BlockNum> insert(const Tuple &key, const Tuple &data);
-    // return if remove min key
-    std::optional<Tuple> remove(const Tuple &key, const Tuple &data);
+    // remove
+    void remove(const Tuple &key);
+    // update
+    std::optional<BlockNum> update(const Tuple &key, const Tuple& data);
+    //  find
+    Tuples find_key(const Tuple &tuple);
+    Tuples find_less(const Tuple &key, bool is_close)const;
+    Tuples find_greater(const Tuple &key, bool is_close)const;
+    Tuples find_range(const Tuple &beg, const Tuple &end, bool is_beg_close, bool is_end_close)const;
+
+    // get
+    Tuples get_all_tuple()const;
+    BlockNum get_block_num()const {return block_num;}
+    BlockNum get_next_record_num()const {return block_num;}
 
     // tuple
     void push_tuple(const Tuple &tuple);
     void push_tuple(Tuple &&tuple);
 
     // sync
-    void sync() const;
+    void sync_disk() const;
+    void sync_cache() const;
 
     // create and drop
     static Record create(const TableProperty &table_property, BlockNum next_record_num);
 
-private:
+private: // function
+    Size get_bytes_size()const;
+    std::string block_path()const {
+        return tp.db_name + "/block.sdb";
+    }
+
+private: // member
     TableProperty tp;
-    const BlockNum block_num;
+    BlockNum block_num;
     BlockNum next_record_num;
-    BlockOffset offset;
+public:
     Tuples tuples;
 };
 

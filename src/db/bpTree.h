@@ -40,20 +40,23 @@ public:
 
     // sql
     void insert(const Tuple &key, const Tuple &data);
-    void remove(Tuple key);
-    void update(Tuple key, const Tuple &data);
-    Tuples find(Tuple key)const;
-    Tuples find(Tuple mid, bool is_less)const;
-    Tuples find(Tuple beg, Tuple end)const;
+    void remove(const Tuple &key);
+    void update(const Tuple &key, const Tuple &data);
+    Tuples find_key(const Tuple &key)const;
+    Tuples find_less(const Tuple &key, bool is_close)const;
+    Tuples find_greater(const Tuple &key, bool is_close)const;
+    Tuples find_range(const Tuple &beg, const Tuple &end, bool is_beg_close, bool is_end_close)const;
 
     // debug log
     void print()const;
 
 private:
-    std::vector<BlockNum> search_path(Tuple key)const;
-    BlockNum search_reocrd_pos(Tuple key)const;
+    std::vector<BlockNum> search_path(const Tuple &key)const;
+    BlockNum search_min_reocrd_pos()const;
     // get
     std::string index_path()const;
+    // bubble split
+    void bubble_split(std::vector<BlockNum> &&lst, const Tuple &key, BlockNum record_pos);
 
     // === 异常处理 ===
     void throw_error(const std::string &str)const{
@@ -61,9 +64,10 @@ private:
     }
 
 private:
+    BlockNum root_pos;
     const TableProperty tp;
     // TODO concurrent map
-    std::unordered_map<BlockNum, std::mutex> map;
+    std::unordered_map<BlockNum, std::mutex> mutex_map;
     // std::mutex global_mutex;
 };
 
@@ -78,7 +82,6 @@ struct BpTree::BptNode {
     // new_node
     static BptNode new_node(const TableProperty &tp);
     
-    bool is_single_key() const {return tp.keys.size() == 1;}
     bool is_full()const;
     Size get_bytes_size()const;
     // return => <key_list_iterator, pos_list_iterator>
@@ -99,6 +102,7 @@ struct BpTree::BptNode {
 
     std::list<Tuple> key_lst;
     std::list<BlockNum> pos_lst;
+
 private:
     TableProperty tp;
     BptNode(const TableProperty &tp):tp(tp){}

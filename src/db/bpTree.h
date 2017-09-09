@@ -28,7 +28,7 @@ public:
     using nodePtr = std::shared_ptr<BptNode>;
 
     BpTree()= delete;
-    BpTree(const TableProperty &tp):tp(tp){}
+    BpTree(const TableProperty &tp, BlockNum &root_pos):root_pos(root_pos), tp(tp){}
     BpTree(const BpTree &bpt)= delete;
     BpTree(BpTree &&bpt)= delete;
     const BpTree &operator=(const BpTree &bpt)= delete;
@@ -43,6 +43,8 @@ public:
     void remove(const Tuple &key);
     void update(const Tuple &key, const Tuple &data);
     Tuples find_key(const Tuple &key)const;
+    // TODO
+    Tuples find_pre_key(const Tuple &key)const;
     Tuples find_less(const Tuple &key, bool is_close)const;
     Tuples find_greater(const Tuple &key, bool is_close)const;
     Tuples find_range(const Tuple &beg, const Tuple &end, bool is_beg_close, bool is_end_close)const;
@@ -52,7 +54,6 @@ public:
 
 private:
     std::vector<BlockNum> search_path(const Tuple &key)const;
-    BlockNum search_min_reocrd_pos()const;
     // get
     std::string index_path()const;
     // bubble split

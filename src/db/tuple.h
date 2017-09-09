@@ -14,7 +14,7 @@ public:
     Tuple &operator=(const Tuple &);
     Tuple &operator=(Tuple &&);
 
-    // index
+    // inde
     db_type::ObjPtr operator[](Size size) {
         assert(size >= 0 && size <= data.size());
         return data[size];
@@ -26,6 +26,7 @@ public:
 
     // compare
     bool eq(const Tuple &tuple)const;
+    bool pre_eq(const Tuple &tuple)const;
     bool less(const Tuple &tuple)const;
 
     // bytes
@@ -36,15 +37,16 @@ public:
     void push_back(db_type::ObjCntPtr ptr){
         data.push_back(ptr->clone());
     }
-    void push_back(db_type::ObjPtr &&ptr){
-        data.push_back(ptr);
-    }
 
     void range(db_type::ObjCntOp op) const {
         for (db_type::ObjCntPtr ptr : data) {
             op(ptr);
         }
     }
+
+    // TODO
+    Tuple select(std::vector<Size> pos_lst);
+
 
 private:
     std::vector<db_type::ObjPtr> data;
@@ -96,6 +98,10 @@ template <>
 inline Bytes en_bytes(Tuple tuple) {
     return tuple.en_bytes();
 }
+
+// type alias
+using TuplePred = std::function<bool(Tuple)>;
+using TupleOp = std::function<Tuple(Tuple)>;
 
 } // namespace sdb
 

@@ -55,11 +55,13 @@ Tuples BpTree::find_key(const Tuple &key)const {
     return record.find_key(key);
 }
 
+// Tuples BpTree::find_pre_key(const Tuple &key)const {
+// }
+
 Tuples BpTree::find_less(const Tuple &key, bool is_close)const {
     Tuples ts(tp.col_property_lst.size());
     auto mid_pos = search_path(key).back();
-    BlockNum min_pos = search_min_reocrd_pos();
-    Record record(tp, min_pos);
+    Record record(tp, tp.record_root);
     while (record.get_block_num() != mid_pos) {
         ts.append(record.get_all_tuple());
         record = Record(tp, record.get_block_num());
@@ -127,14 +129,6 @@ std::vector<BlockNum> BpTree::search_path(const Tuple &key)const {
     }
 }
 
-BlockNum BpTree::search_min_reocrd_pos()const{
-    BptNode node = BptNode::get(tp, root_pos);
-    while (!node.is_leaf) {
-        node = BptNode::get(tp, node.pos_lst.front());
-    }
-    return node.pos_lst.front();
-}
-
 void BpTree::bubble_split(std::vector<BlockNum> &&lst, const Tuple &key, BlockNum record_pos) {
     BlockNum insert_pos = record_pos;
     mutex_map[insert_pos].lock();
@@ -189,7 +183,7 @@ BpTree::BptNode BpTree::BptNode::get(const TableProperty &tp, BlockNum pos) {
     for (int i = 0; i < size; i++) {
         Tuple keys;
         for (auto &&cp : cps) {
-            ObjPtr key = db_type::get_default(cp.col_type, cps[0].type_size);
+            ObjPtr key = db_type::get_default(cp.type_info);
             key->de_bytes(bytes, offset);
             keys.push_back(key);
         }

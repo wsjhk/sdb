@@ -6,229 +6,184 @@
 #include <utility>
 #include <functional>
 
-#include "bpTree.h"
 #include "table.h"
+
+#include "bpTree.h"
 #include "util.h"
 #include "io.h"
 #include "cache.h"
+#include "block_alloc.h"
 
+namespace sdb {
 
-using std::ios;
-using std::vector;
-using SDB::Type::Pos;
-using SDB::Type::PosList;
-using SDB::Type::Bytes;
-using SDB::Type::Value;
-using SDB::Enum::ColType;
+using TablePtr = Table::TablePtr;
+// static init
+tbb::concurrent_unordered_map<std::pair<std::string, std::string>, TablePtr> Table::table_map;
 
-using namespace SDB;
-
-// SQL
-void Table::insert(const Type::TupleData &tuple_data) {
-    auto bytes = tuple_data.en_bytes();
-    BpTree bpTree(property);
-    bpTree.insert(tuple_data.get_value(property.get_col_name_lst(), property.key), bytes);
+// ========== public function ========
+void Table::init(const std::string &db_name) {
+    // .table_list
+    auto tlt_ptr = table_list_table(db_name);
+    table_map[{db_name, ".table_list"}] = tlt_ptr;
+    // .col_list
+    auto clt_ptr = table_list_table(db_name);
+    table_map[{db_name, ".col_list"}] = clt_ptr;
+    // .index
+    auto idt_ptr = table_list_table(db_name);
+    table_map[{db_name, ".index"}] = idt_ptr;
 }
 
-void Table::update(const std::string &pred_col_name, SDB::Type::BVFunc predicate,
-                   const std::string &op_col_name, SDB::Type::VVFunc op) {
-    Record record(property);
-    BpTree bpTree(property);
-    bool is_var_type = SDB::Function::is_var_type(property.get_col_type(op_col_name));
-    if (!is_has_index(pred_col_name) && !is_var_type) {
-        record.update(pred_col_name, predicate, op_col_name, op);
-        return;
+TablePtr Table::get_table(const std::string &db_name, const std::string &table_name) {
+    auto it = table_map.find({db_name, table_name});
+    if (it == table_map.end()) {
+        throw TableNotFound(table_name);
     }
-    // get tuple lst
-    TupleLst tuple_lst(property.get_col_name_lst());
-    if (is_has_index(pred_col_name)) {
-        PosList pos_lst = bpTree.find(predicate);
-        tuple_lst = record.read_record(pos_lst);
-    } else {
-        tuple_lst = record.find(pred_col_name, predicate);
-    }
-    // data update
-    for (auto &&tuple_data : tuple_lst.data) {
-        Value key = tuple_data.get_value(property.get_col_name_lst(), property.key);
-        Type::Pos pred_pos = Type::TupleData::get_col_name_pos(tuple_lst.col_name_lst, pred_col_name);
-        Type::Pos op_pos = Type::TupleData::get_col_name_pos(tuple_lst.col_name_lst, op_col_name);
-        tuple_data.set_value(pred_pos, op_pos, predicate, op);
-        Bytes data = tuple_data.en_bytes();
-        bpTree.update(key, data);
-    }
+    return it->second;
 }
 
-void Table::remove(const std::string &col_name, const Value &value) {
-    BpTree bpTree(property);
-    if (is_has_index(col_name)) {
-        bpTree.remove(value);
-        return;
-    }
-    TupleLst tuple_lst = find(col_name, value);
-    for (auto &&tuple_data : tuple_lst.data) {
-        Value key = tuple_data.get_value(property.get_col_name_lst(), property.key);
-        bpTree.remove(key);
-    }
-}
+void Table::create_table(const TableProperty &property) {
+    // table list
+    Tuple tl_tuple;
+    auto table_name_ptr = std::make_shared<db_type::Varchar>(64, property.table_name);
 
-void Table::remove(const std::string &col_name, std::function<bool(Value)> predicate) {
-    TupleLst tuple_lst = find(col_name, predicate);
-    BpTree bpTree(property);
-    for (auto &&td : tuple_lst.data) {
-        Value value = td.get_value(property.get_col_name_lst(), property.key);
-        bpTree.remove(value);
-    }
-}
+    tl_tuple.push_back(table_name_ptr->clone());
+    BlockNum pos = BlockAlloc::get().new_block(property.db_name);
+    tl_tuple.push_back(std::make_shared<db_type::Int>(pos));
+    table_map[{property.db_name, ".table_list"}]->insert(tl_tuple);
 
-Table::TupleLst Table::find(const std::string &col_name, const SDB::Type::Value &value) {
-    Record record(property);
-    if (col_name == property.key) {
-        BpTree bpTree(property);
-        PosList pos_lst = bpTree.find(value);
-        return record.read_record(pos_lst);
-    }
-    auto predicate = SDB::Function::get_bvfunc(SDB::Enum::EQ, value);
-    return record.find(col_name, predicate);
-}
-
-Record::TupleLst Table::find(const std::string &col_name, std::function<bool(Value)> predicate) {
-    Record record(property);
-    if (col_name == property.key) {
-        PosList pos_lst;
-        BpTree bpTree(property);
-        pos_lst = bpTree.find(predicate);
-//        for (auto &&pos : pos_lst) {
-//            std::cout << pos << " ";
-//        }
-//        std::cout << std::endl;
-        return record.read_record(pos_lst);
-    }
-    return record.find(col_name, predicate);
-}
-
-void Table::create_table(const SDB::Type::TableProperty &property) {
-    // table meta
-    // create dir
-    IO::create_dir(property.db_name+"/"+property.table_name);
-    write_meta_data(property);
-
-    //index
-    Record::create(property);
-
-    //record
-    BpTree::create(property);
-}
-
-void Table::drop_table() {
-    Cache &cache = Cache::make();
-    cache.pop_file(get_table_meta_path(property));
-    IO::delete_file(get_table_meta_path(property));
-    // index
-    BpTree::drop(property);
-    //record
-    Record::drop(property);
-    // drop dir
-    IO::remove_dir(property.db_name+"/"+property.table_name);
-    is_table_drop = true;
-}
-
-void Table::add_referenced(const std::string &table_name, const std::string &col_name) {
-    property.referenced_map[table_name] = col_name;
-}
-
-void Table::add_referencing(const std::string &table_name, const std::string &col_name) {
-    property.referencing_map[table_name] = col_name;
-}
-
-void Table::remove_referenced(const std::string &table_name) {
-    property.referenced_map.erase(table_name);
-}
-
-void Table::remove_referencing(const std::string &table_name) {
-    property.referencing_map.erase(table_name);
-}
-
-bool Table::is_referenced() const {
-    return !property.referenced_map.empty();
-}
-
-bool Table::is_referencing()const{
-    return property.referencing_map.empty();
-}
-
-bool Table::is_referencing(const std::string &table_name)const{
-    return (property.referencing_map.find(table_name) != property.referencing_map.end());
-}
-
-std::unordered_map<std::string, std::string> Table::get_referenced_map()const {
-    return property.referenced_map;
-}
-std::unordered_map<std::string, std::string> Table::get_referencing_map()const {
-    return property.referencing_map;
-}
-
-std::string Table::get_key()const {
-    return property.key;
-}
-
-// ========= private ========
-void Table::read_meta_data(const std::string &db_name, const std::string &table_name) {
-    property.db_name = db_name;
-    property.table_name = table_name;
-    Bytes bytes = Cache::make().read_file(get_table_meta_path(property));
-    size_t offset = 0;
-    Function::de_bytes(property.key, bytes, offset);
-    size_t col_count;
-    Function::de_bytes(col_count, bytes, offset);
-    for (size_t i = 0; i < col_count; ++i) {
-        Type::ColProperty cp = Type::ColProperty::de_bytes(bytes, offset);
-        property.col_property_lst.push_back(cp);
-    }
-    // referencing_map
-    // bytes : <unordered_map> [[col_name][table_name]]*
-    Function::de_bytes(property.referencing_map, bytes, offset);
-    // referenced_map
-    // bytes : <unordered_map> |[table_name][col_name]|*
-    Function::de_bytes(property.referenced_map, bytes, offset);
-}
-
-void Table::write_meta_data(const SDB::Type::TableProperty &property) {
-    // write table property
-    Bytes bytes;
-    // key
-    Function::bytes_append(bytes, property.key);
-    // tuple property list
-    // bytes : [[col_name][col_type][type_size]]*
-    Function::bytes_append(bytes, property.col_property_lst.size());
-    for (auto &&item : property.col_property_lst) {
+    // col list
+    auto col_list_ptr = table_map[{property.db_name, ".col_list"}];
+    int order_num = 0;
+    std::list<std::string> key_list;
+    for (auto &&cl : property.col_property_lst) {
+        Tuple cl_tuple;
+        // table name
+        tl_tuple.push_back(table_name_ptr->clone());
         // col name
-        Function::bytes_append(bytes, item.col_name);
-        // type
-        Function::bytes_append(bytes, item.col_type);
-        // type size
-        Function::bytes_append(bytes, item.type_size);
-        // default value
-        Bytes dv_bytes = item.default_value.en_bytes();
-        bytes.insert(bytes.end(), dv_bytes.begin(), dv_bytes.end());
+        tl_tuple.push_back(std::make_shared<db_type::Varchar>(64, cl.col_name));
+        // type info
+        tl_tuple.push_back(std::make_shared<db_type::Varchar>(64, cl.type_info));
+        // order num
+        tl_tuple.push_back(std::make_shared<db_type::Int>(order_num));
+        order_num++;
+        // is key
+        if (cl.is_key) key_list.push_back(cl.col_name);
+        tl_tuple.push_back(std::make_shared<db_type::Char>(cl.is_key));
         // is not null
-        Function::bytes_append(bytes, item.is_not_null);
+        tl_tuple.push_back(std::make_shared<db_type::Char>(cl.is_not_null));
+        col_list_ptr->insert(cl_tuple);
     }
-    // referencing_map
-    // bytes : <unordered_map> [[col_name][table_name]]*
-    Function::bytes_append(bytes, property.referencing_map);
-    // referenced_map
-    // bytes : <unordered_map> |[table_name][col_name]|*
-    Function::bytes_append(bytes, property.referenced_map);
 
-    // write to meta file
-    Cache::make().write_file(get_table_meta_path(property), bytes);
+    // index
+    table_map[{property.db_name, ".col_list"}]->create_index("keys_idx", key_list);
 }
 
-bool Table::is_has_index(const std::string &col_name) const {
-    return col_name == property.key;
+void Table::drop_table(const std::string &db_name, const std::string &table_name) {
+    // col list
+    auto clt_ptr = table_map[{db_name, ".col_list"}];
+    Tuple table_name_key;
+    table_name_key.push_back(std::make_shared<db_type::Varchar>(64, table_name));
+    Tuples ts = clt_ptr->keys_index->find_pre_key(table_name_key);
+    auto keys_pos = clt_ptr->tp.get_keys_pos();
+    for (auto &&tuple : ts.data) {
+        auto remove_key = tuple.select(keys_pos);
+        clt_ptr->keys_index->remove(remove_key);
+    }
+
+    // index
+    clt_ptr->remove_index("keys_idx");
+
+    // table list
+    table_map[{db_name, ".table_list"}]->remove(table_name_key);
+    // delete from
 }
 
 // ========== private function ========
-std::string Table::get_table_meta_path(const TableProperty &property) {
-    return property.db_name + "/" + property.table_name + "/meta.sdb";
+Table::Table(const TableProperty &tp, bool is_init = false):tp(tp){
+    if (is_init) {
+        return;
+    }
+    auto ptr = table_map[{tp.db_name, ".index"}];
+    Tuple tuple;
+    tuple.push_back(std::make_shared<db_type::Varchar>(64, tp.table_name));
+    tuple.push_back(std::make_shared<db_type::Varchar>(64, "keys_idx"));
+    Tuples ts = ptr->keys_index->find_pre_key(tuple);
+    assert(!ts.data.empty());
+    BlockNum root_pos;
+    std::memcpy(&root_pos, ts.data[0][3]->en_bytes().data(), 8);
+    keys_index = std::make_shared<BpTree>(tp, root_pos);
 }
+
+
+TablePtr Table::table_list_table(const std::string &db_name) {
+    // .table_list table attributes:
+    //
+    // 0. table_name  : Varchar(64)
+    // 1. record_root : Int
+    // 
+    using namespace db_type;
+    ColProperty table_name_col("table_name", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), true);
+    ColProperty record_root("record_root", sdb::en_bytes(static_cast<char>(INT)));
+    TableProperty meta_tp(db_name, ".table_list", 0, {table_name_col, record_root});
+    return std::make_shared<Table>(meta_tp);
+}
+
+TablePtr Table::col_list_table(const std::string &db_name) {
+    // .col_list table attributes:
+    //
+    // 0. table_name     : Varchar(64)
+    // 1. col_name       : Varchar(64)
+    // 2. type_info      : Varchar(64)
+    // 3. order_num      : Int
+    // 4. is_key : Char
+    // 5. is_not_null    : Char
+    // 
+    using namespace db_type;
+    // setting col property
+    TableProperty::ColPropertyList cp_lst;
+    ColProperty table_name_cp("table_name", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), true);
+    cp_lst.push_back(table_name_cp);
+
+    ColProperty col_name_cp("col_name", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), true);
+    cp_lst.push_back(col_name_cp);
+
+    ColProperty is_key_cp("is_key", sdb::en_bytes(static_cast<char>(CHAR)));
+    cp_lst.push_back(is_key_cp);
+
+    ColProperty is_not_null_cp("is_not_null", sdb::en_bytes(static_cast<char>(CHAR)));
+    cp_lst.push_back(is_not_null_cp);
+
+    // get table property
+    TableProperty col_list_tp(db_name, ".col_list", 1, cp_lst);
+    return std::make_shared<Table>(col_list_tp);
+}
+
+TablePtr Table::index_table(const std::string &db_name) {
+    // .index table attributes:
+    //
+    // 0. table_name : Varchar(64)
+    // 1. index_name : Varchar(64)
+    // 2. col_name   : Varchar(64)
+    // 3. index_root : Int
+    // 
+    using namespace db_type;
+    // setting col property
+    TableProperty::ColPropertyList cp_lst;
+    ColProperty table_name_cp("table_name", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), true);
+    cp_lst.push_back(table_name_cp);
+
+    ColProperty index_name_cp("index_name", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), true);
+    cp_lst.push_back(index_name_cp);
+
+    ColProperty col_name_cp("col_name", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), true);
+    cp_lst.push_back(col_name_cp);
+
+    ColProperty index_root_cp("index_root", sdb::en_bytes(static_cast<char>(INT)));
+    cp_lst.push_back(index_root_cp);
+
+    // get table property
+    TableProperty index_tp(db_name, ".index", 2, cp_lst);
+    return std::make_shared<Table>();
+}
+
+} // namespace sdb

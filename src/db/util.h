@@ -31,8 +31,8 @@ using BlockNum = int64_t;
 using BlockOffset = Size;
 
 // bytes
-// using Byte = char;
-using Bytes = std::vector<std::byte>;
+using Byte = char;
+using Bytes = std::vector<Byte>;
 
 // traits
 namespace Traits {

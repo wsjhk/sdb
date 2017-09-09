@@ -1,43 +1,58 @@
-#ifndef TABLE_H
-#define TABLE_H
+#ifndef DB_TABLE_H
+#define DB_TABLE_H
 
 #include <string>
 #include <map>
+#include <tbb/concurrent_unordered_map.h>
 
 #include "record.h"
 #include "util.h"
-#include "type.h"
+#include "bpTree.h"
+
+namespace sdb {
+
+struct TableError : public std::runtime_error {
+    TableError(const std::string &msg):runtime_error(msg){}
+};
+
+struct TableNotFound : public TableError {
+    TableNotFound(const std::string &table_name)
+        :TableError(cpp_util::format("table [%s] not found", table_name)) {}
+};
 
 class Table {
 public:
-    // type
-    using Pos = SDB::Type::Pos ;
-    using PosList= SDB::Type::PosList;
-    using Value = SDB::Type::Value;
-    using Tuple = SDB::Type::Tuple;
-    using TupleLst = SDB::Type::TupleLst;
-    using TableProperty = SDB::Type::TableProperty;
+    using TablePtr = std::shared_ptr<Table>;
 
-    //
-    Table()= delete;
-    Table(const std::string &db_name, const std::string &table_name){
-        read_meta_data(db_name, table_name);
-    }
-    ~Table()noexcept {
-        if (!is_table_drop) {
-            write_meta_data(property);
-        }
-    }
-    // sql
-    static void create_table(const SDB::Type::TableProperty &property);
-    void drop_table();
-    void insert(const SDB::Type::TupleData &tuple_data);
-    void remove(const std::string &col_name, const Value &value);
-    void remove(const std::string &col_name, SDB::Type::BVFunc predicate);
-    void update(const std::string &pred_col_name, SDB::Type::BVFunc predicate,
-                const std::string &op_col_name, SDB::Type::VVFunc op);
-    TupleLst find(const std::string &col_name, const SDB::Type::Value &value);
-    TupleLst find(const std::string &col_name, std::function<bool(Value)> predicate);
+    static void init(const std::string &db_name);
+    static TablePtr get_table(const std::string &db_name, const std::string &table_name);
+
+    static void create_table(const TableProperty &property);
+    static void drop_table(const std::string &db_name, const std::string &table_name);
+
+    // index
+    void create_index(const std::string &index_name, const std::list<std::string> &col_name_list);
+    void remove_index(const std::string &index_name);
+
+    // insert a tuple
+    void insert(const Tuple &tuple);
+
+    // remove by key
+    void remove(const Tuple &key);
+    void remove(TuplePred pred);
+
+    // can't update primary key, 
+    // use insert/remove in primary index if need update key
+    void update(const Tuple &new_tuple);
+
+    // find use primary index
+    Tuples find(const Tuple &key);
+    Tuples find_less(const Tuple &key, bool is_close);
+    Tuples find_greater(const Tuple &key, bool is_close);
+    Tuples find_range(const Tuple &beg, const Tuple &end, 
+                      bool is_beg_close, bool is_end_close);
+    // find use record
+    Tuples find(TuplePred pred);
 
     void add_referencing(const std::string &table_name, const std::string &col_name);
     void add_referenced(const std::string &table_name, const std::string &col_name);
@@ -51,19 +66,29 @@ public:
     std::unordered_map<std::string, std::string> get_referenced_map()const;
     std::unordered_map<std::string, std::string> get_referencing_map()const;
     std::string get_key()const;
-    std::vector<std::string> get_col_name_lst()const{return property.get_col_name_lst();}
+    std::vector<std::string> get_col_name_lst()const{return tp.get_col_name_lst();}
 
 private:
-    //function
-    static std::string get_table_meta_path(const TableProperty &property);
+    Table()= delete;
+    Table(const TableProperty &tp, bool is_init);
 
-    void read_meta_data(const std::string &db_name, const std::string &table_name);
-    static void write_meta_data(const SDB::Type::TableProperty &property);
     bool is_has_index(const std::string &col_name)const;
-    bool is_table_drop = false;
+
+    // meta table
+    static TablePtr table_list_table(const std::string &db_name);
+    static TablePtr col_list_table(const std::string &db_name);
+    static TablePtr index_table(const std::string &db_name);
+
+    TableProperty get_table_property(const std::string &table_name);
+
 
 private:
-    SDB::Type::TableProperty property;
+    TableProperty tp;
+    std::shared_ptr<BpTree> keys_index;
+    // std::vector<BpTree> bpt_index_lst;
+    static tbb::concurrent_unordered_map<std::pair<std::string, std::string>, TablePtr> table_map;
 };
+
+} // namespace sdb
 
 #endif

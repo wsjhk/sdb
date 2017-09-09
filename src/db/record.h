@@ -62,7 +62,7 @@ private: // function
 private: // member
     TableProperty tp;
     BlockNum block_num;
-    BlockNum next_record_num;
+    BlockNum next_record_num = -1;
 public:
     Tuples tuples;
 };

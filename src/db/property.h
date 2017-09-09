@@ -12,24 +12,12 @@ namespace sdb {
 
 struct ColProperty {
     std::string col_name;
-    db_type::TypeTag col_type;
-    size_t type_size;
-    db_type::ObjCntPtr default_value;
-    char is_not_null;
+    db_type::TypeInfo type_info;
+    bool is_key;
+    bool is_not_null;
 
     ColProperty()=delete;
-    ColProperty(const std::string &col_name, db_type::TypeTag col_type, size_t type_size)
-        :col_name(col_name), col_type(col_type), type_size(type_size),
-         default_value(db_type::get_default(col_type, type_size)), is_not_null(true){}
-
-    ColProperty(const std::string col_name, 
-                db_type::TypeTag col_type,
-                size_t type_size,
-                db_type::ObjCntPtr obj,
-                char is_not_null)
-        :col_name(col_name), col_type(col_type),
-         type_size(type_size), default_value(obj),
-         is_not_null(is_not_null){}
+    ColProperty(const std::string &col_name, db_type::TypeInfo type_info, bool is_key = false, bool is_not_null = true):col_name(col_name), type_info(type_info), is_key(is_key), is_not_null(is_not_null){}
 
     Bytes en_bytes()const;
     static ColProperty de_bytes(const Bytes &bytes, Size &offset);
@@ -43,7 +31,6 @@ struct TableProperty {
     // Type
     std::string db_name;
     std::string table_name;
-    std::vector<std::string> keys;
     BlockNum record_root;
     ColPropertyList col_property_lst;
     // integrity
@@ -55,15 +42,16 @@ struct TableProperty {
     // TableProperty(){}
     TableProperty(const std::string &db_name,
                   const std::string &table_name,
-                  const std::vector<std::string> &keys,
                   BlockNum record_root,
                   const ColPropertyList &col_property_lst)
-            :db_name(db_name), table_name(table_name), keys(keys), record_root(record_root), col_property_lst(col_property_lst){}
+            :db_name(db_name), table_name(table_name), record_root(record_root), col_property_lst(col_property_lst){}
 
     // getter
     Size get_col_property_pos(const std::string &col_name)const;
     std::vector<std::string> get_col_name_lst()const;
     ColPropertyList get_keys_property()const;
+    // TODO
+    std::vector<Size> get_keys_pos()const;
 };
 
 } // namespace sdb

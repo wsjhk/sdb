@@ -1,8 +1,6 @@
-#ifndef DB_TYPE
-#define DB_TYPE
+#ifndef DB_DB_TYPE_H
+#define DB_DB_TYPE_H
 
-#include <boost/any.hpp>
-#include <boost/format.hpp>
 #include <type_traits>
 #include <memory>
 
@@ -26,10 +24,15 @@ inline std::shared_ptr<T> dfc(U &&u) {
 // type tag
 enum TypeTag : char {
     NONE,
+    CHAR,
     INT,
     UINT,
-    VARCHAR
+    BIGINT,
+    VECTOR,
+    VARCHAR,
 };
+
+using TypeInfo = Bytes;
 
 struct DBTypeError : public std::runtime_error {
     DBTypeError(const std::string &str)
@@ -81,6 +84,10 @@ public:
     
     // assignment
     virtual void assign(SP<const Object> obj) =0;
+
+    void throw_mismatching(std::shared_ptr<const Object> obj, const std::string &op) const {
+        throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), op);
+    }
 };
 
 // object alias
@@ -124,6 +131,39 @@ struct None : public Object {
     void assign(SP<const Object>) override{
         throw DBTypeNullError();
     }
+};
+
+// ===== Char =====
+class Char : public Object {
+    explicit Char(char ch):data(ch){}
+
+    TypeTag get_type_tag()const override {return CHAR;}
+    std::string get_type_name()const override {return "char";}
+    int get_type_size()const override {return 1;}
+    int get_size()const override {return 1;}
+
+    // show
+    std::string to_string()const override {return std::string(1, data);}
+    
+    // clone
+    std::shared_ptr<Object> clone()const override {
+        return std::make_shared<Char>(data);
+    }
+
+    // bytes
+    Bytes en_bytes()const override {return sdb::en_bytes(data);}
+    void de_bytes(const Bytes &bytes, Size &offset)override{
+        sdb::de_bytes(data, bytes, offset);
+    }
+
+    // operator
+    bool less(SP<const Object> obj)const override;
+    bool eq(SP<const Object>)const override;
+
+    void assign(SP<const Object>) override;
+
+private:
+    char data;
 };
 
 // ===== Integer =====
@@ -176,73 +216,47 @@ public:
 // === Integer === 
 using Int = Integer<int32_t>;
 using UInt = Integer<uint32_t>;
+using BigInt = Integer<uint64_t>;
 
 // === Float ===
 // approximate float
+//
 
-// ===== string =====
-// string abstract class
-class String : public Object {
+// ===== List ===== 
+class Vector : public Object {
 public:
-    String()=default;
-    String(const std::string &data):data(data){}
-
-    int get_size()const override {return data.size();}
-
-    // show
-    std::string to_string()const override{return data;}
-
-    // bytes
-    Bytes en_bytes()const override{
-        return sdb::en_bytes(data);
-    }
-    void de_bytes(const Bytes &bytes, int &offset) override {
-        sdb::de_bytes(data, bytes, offset);
-    }
-
-    // operator
-    bool less(SP<const Object> obj)const override {
-        if (auto p = dfc<const String>(obj)) {
-            return data < p->data;
-        } else {
-            throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "<");
-        }
-    }
-
-    bool eq(SP<const Object> obj)const override {
-        if (auto p = dfc<const String>(obj)) {
-            return data == p->data;
-        } else {
-            throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "=");
-        }
-    }
-
-public:
-    std::string data;
-};
-
-// Varchar
-class Varchar : public String {
-public:
-    Varchar()=delete;
-    Varchar(int s):String(), max_size(s){
-        assert(max_size <= 512);
-    }
-    Varchar(const std::string &str, int s):String(str), max_size(s){check_size(str.size());}
+    Vector()=delete;
+    Vector(TypeTag vtt, Size max_size):vtt(vtt), max_size(max_size){}
+    Vector(TypeTag vtt, Size max_size, const std::vector<ObjPtr> &data);
+    Vector(const TypeInfo &info);
 
     // type
-    TypeTag get_type_tag()const override { return VARCHAR; }
-    std::string get_type_name()const override { return "varchar"; }
-    int get_type_size()const override { return max_size; }
+    TypeTag get_type_tag()const override {return VECTOR;}
+    std::string get_type_name()const override {return "vector";}
+    Size get_type_size()const override {
+        return max_size * get_type_size(vtt);
+    }
+    Size get_size()const override {
+        return data.size() * get_type_size(vtt);
+    };
+
+    // show
+    std::string to_string()const override;
 
     // clone
-    std::shared_ptr<Object> clone()const override {
-        return std::make_shared<Varchar>(data, max_size);
-    }
+    std::shared_ptr<Object> clone()const override;
+    
+    // bytes
+    Bytes en_bytes()const override;
+    void de_bytes(const Bytes &bytes, int &offset) override;
 
+    // operator
+    bool less(SP<const Object> obj)const override;
+    bool eq(SP<const Object> obj)const override;
+
+    // assignment
     void assign(SP<const Object> obj) override;
-
-    void check_size(int size)const {
+    void check_size(Size size)const {
         if (size > max_size || size < 0) {
             auto msg = format("TypeError: %s > max_size[%s]", size, max_size);
             throw DBTypeOverflowError(msg);
@@ -250,18 +264,53 @@ public:
     }
 
 private:
-    int max_size;
+    static Size get_type_size(TypeTag tt);
+
+public:
+    std::vector<ObjPtr> data;
+private:
+    TypeTag vtt;
+    Size max_size;
+};
+
+// ===== string =====
+// string abstract class
+// Varchar
+class Varchar : public Vector {
+public:
+    Varchar()=delete;
+    Varchar(int max_size):Vector(CHAR, max_size) {}
+    Varchar(int max_size, const std::string &str);
+    Varchar(const TypeInfo &info):Vector(info){}
+
+    // type
+    TypeTag get_type_tag()const override { return VARCHAR; }
+    std::string get_type_name()const override { return "varchar"; }
+    Size get_type_size()const override { return Vector::get_type_size(); }
+    Size get_size()const override { return Vector::get_size(); }
+
+    // clone
+    std::shared_ptr<Object> clone()const override {
+        return std::make_shared<Varchar>(get_type_size(), data);
+    }
+
+    void assign(SP<const Object> obj) override;
 };
 
 // ========== type function ==========
-static ObjPtr get_default(TypeTag tag, int size) {
+static ObjPtr get_default(TypeInfo type_info) {
+    TypeTag tag = static_cast<TypeTag>(type_info[0]);
     switch (tag) {
         case INT:
             return std::make_shared<Int>();
         case UINT: 
             return std::make_shared<UInt>();
+        case BIGINT: 
+            return std::make_shared<BigInt>();
         case VARCHAR:
-            return std::make_shared<Varchar>(size);
+            return std::make_shared<Varchar>(type_info);
+        case VECTOR:
+            return std::make_shared<Vector>(type_info);
         default:
             return std::make_shared<None>();
     }
@@ -276,6 +325,8 @@ std::string Integer<T>::get_type_name()const{
         return "int";
     } else if constexpr (std::is_same<T, uint32_t>::value){
         return "uint";
+    } else if constexpr (std::is_same<T, int64_t>::value){
+        return "bigint";
     } else {
         static_assert(Traits::always_false<T>::value);
     }
@@ -287,7 +338,11 @@ TypeTag Integer<T>::get_type_tag()const{
         return INT;
     } else if constexpr (std::is_same<T, uint32_t>::value){
         return UINT;
-    } 
+    } else if constexpr (std::is_same<T, int64_t>::value){
+        return BIGINT;
+    }  else {
+        static_assert(Traits::always_false<T>::value);
+    }
 }
 
 // operator
@@ -364,15 +419,6 @@ SP<Object> Integer<T>::div(SP<const Object> obj)const{
     }
 }
 
-// template <typename T>
-// void Integer<T>::assign(SP<const Object> obj) {
-//     if (auto p = dfc<const Integer<T>>(obj)) {
-//         data = p->data;
-//     } else {
-//         throw DBTypeMismatchingError(get_type_name(), obj->get_type_name(), "/");
-//     }
-// }
-
 template <typename T>
 void Integer<T>::assign(SP<const Object> obj) {
     if (auto p = dfc<const Integer<T>>(obj)) {
@@ -393,4 +439,4 @@ namespace sdb {
 
 
 
-#endif /* ifndef DB_TYPE */
+#endif /* ifndef DB_DB_TYPE_H */

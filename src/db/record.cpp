@@ -1,5 +1,3 @@
-#include <map>
-
 #include "record.h"
 #include "util.h"
 #include "cache.h"

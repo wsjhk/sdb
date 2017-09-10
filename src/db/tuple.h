@@ -45,7 +45,7 @@ public:
     }
 
     // TODO
-    Tuple select(std::vector<Size> pos_lst);
+    Tuple select(std::vector<Size> pos_lst)const;
 
 
 private:

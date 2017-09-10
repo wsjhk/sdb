@@ -18,19 +18,22 @@ namespace sdb {
 
 using TablePtr = Table::TablePtr;
 // static init
-tbb::concurrent_unordered_map<std::pair<std::string, std::string>, TablePtr> Table::table_map;
+std::map<std::pair<std::string, std::string>, TablePtr> Table::table_map;
 
 // ========== public function ========
 void Table::init(const std::string &db_name) {
+    // .index
+    auto idt_ptr = table_list_table(db_name);
+    table_map[{db_name, ".index"}] = idt_ptr;
     // .table_list
     auto tlt_ptr = table_list_table(db_name);
     table_map[{db_name, ".table_list"}] = tlt_ptr;
     // .col_list
     auto clt_ptr = table_list_table(db_name);
     table_map[{db_name, ".col_list"}] = clt_ptr;
-    // .index
-    auto idt_ptr = table_list_table(db_name);
-    table_map[{db_name, ".index"}] = idt_ptr;
+    // .reference
+    auto rft_ptr = get_table(db_name, ".reference");
+    table_map[{db_name, ".reference"}] = rft_ptr;
 }
 
 TablePtr Table::get_table(const std::string &db_name, const std::string &table_name) {
@@ -42,43 +45,55 @@ TablePtr Table::get_table(const std::string &db_name, const std::string &table_n
 }
 
 void Table::create_table(const TableProperty &property) {
-    // table list
-    Tuple tl_tuple;
-    auto table_name_ptr = std::make_shared<db_type::Varchar>(64, property.table_name);
-
-    tl_tuple.push_back(table_name_ptr->clone());
+    // new record root block
     BlockNum pos = BlockAlloc::get().new_block(property.db_name);
-    tl_tuple.push_back(std::make_shared<db_type::Int>(pos));
-    table_map[{property.db_name, ".table_list"}]->insert(tl_tuple);
+
+    // copy property
+    TableProperty new_tp = property;
+    new_tp.record_root = pos;
+
+    // new table and create index
+    TablePtr new_table_ptr = std::make_shared<Table>(new_tp, true);
+    new_table_ptr->keys_index = BpTree::build(new_tp);
+
+    // table name
+    auto table_name_ptr = std::make_shared<db_type::Varchar>(64, property.table_name);
 
     // col list
     auto col_list_ptr = table_map[{property.db_name, ".col_list"}];
     int order_num = 0;
-    std::list<std::string> key_list;
     for (auto &&cl : property.col_property_lst) {
         Tuple cl_tuple;
         // table name
-        tl_tuple.push_back(table_name_ptr->clone());
+        cl_tuple.push_back(table_name_ptr->clone());
         // col name
-        tl_tuple.push_back(std::make_shared<db_type::Varchar>(64, cl.col_name));
+        cl_tuple.push_back(std::make_shared<db_type::Varchar>(64, cl.col_name));
         // type info
-        tl_tuple.push_back(std::make_shared<db_type::Varchar>(64, cl.type_info));
+        cl_tuple.push_back(std::make_shared<db_type::Varchar>(64, cl.type_info));
         // order num
-        tl_tuple.push_back(std::make_shared<db_type::Int>(order_num));
+        cl_tuple.push_back(std::make_shared<db_type::Int>(order_num));
         order_num++;
         // is key
-        if (cl.is_key) key_list.push_back(cl.col_name);
-        tl_tuple.push_back(std::make_shared<db_type::Char>(cl.is_key));
+        cl_tuple.push_back(std::make_shared<db_type::Char>(cl.is_key));
         // is not null
-        tl_tuple.push_back(std::make_shared<db_type::Char>(cl.is_not_null));
+        cl_tuple.push_back(std::make_shared<db_type::Char>(cl.is_not_null));
         col_list_ptr->insert(cl_tuple);
     }
 
-    // index
-    table_map[{property.db_name, ".col_list"}]->create_index("keys_idx", key_list);
+    // table list
+    Tuple tl_tuple;
+    tl_tuple.push_back(table_name_ptr->clone());
+    tl_tuple.push_back(std::make_shared<db_type::Int>(pos));
+    table_map[{property.db_name, ".table_list"}]->insert(tl_tuple);
+
+    // insert table map
+    table_map[{property.db_name, property.table_name}] = new_table_ptr;
 }
 
 void Table::drop_table(const std::string &db_name, const std::string &table_name) {
+    auto it = table_map.find({db_name, table_name});
+    if (it == table_map.end()) throw TableNotFound(table_name);
+
     // col list
     auto clt_ptr = table_map[{db_name, ".col_list"}];
     Tuple table_name_key;
@@ -90,12 +105,45 @@ void Table::drop_table(const std::string &db_name, const std::string &table_name
         clt_ptr->keys_index->remove(remove_key);
     }
 
-    // index
-    clt_ptr->remove_index("keys_idx");
-
     // table list
     table_map[{db_name, ".table_list"}]->remove(table_name_key);
-    // delete from
+    // index
+    table_map[{db_name, ".index"}]->remove(table_name_key);
+    it->second->keys_index->drop();
+
+    // erase in table_map
+    table_map.erase(it);
+}
+
+void Table::insert(const Tuple &tuple) {
+    Tuple keys = tuple.select(tp.get_keys_pos());
+    keys_index->insert(keys, tuple);
+}
+
+void Table::remove(const Tuple &keys) {
+    keys_index->remove(keys);
+}
+
+void Table::update(const Tuple &new_tuple) {
+    Tuple keys = new_tuple.select(tp.get_keys_pos());
+    keys_index->update(keys, new_tuple);
+}
+
+Tuples Table::find(const Tuple &keys) {
+    return keys_index->find_key(keys);
+}
+
+Tuples Table::find_less(const Tuple &keys, bool is_close) {
+    return keys_index->find_less(keys, is_close);
+}
+
+Tuples Table::find_greater(const Tuple &keys, bool is_close) {
+    return keys_index->find_greater(keys, is_close);
+}
+
+Tuples Table::find_range(const Tuple &beg, const Tuple &end, 
+                  bool is_beg_close, bool is_end_close) {
+    return keys_index->find_range(beg, end, is_beg_close, is_end_close);
 }
 
 // ========== private function ========
@@ -109,7 +157,7 @@ Table::Table(const TableProperty &tp, bool is_init = false):tp(tp){
     tuple.push_back(std::make_shared<db_type::Varchar>(64, "keys_idx"));
     Tuples ts = ptr->keys_index->find_pre_key(tuple);
     assert(!ts.data.empty());
-    BlockNum root_pos;
+    BlockNum root_pos = 0;
     std::memcpy(&root_pos, ts.data[0][3]->en_bytes().data(), 8);
     keys_index = std::make_shared<BpTree>(tp, root_pos);
 }
@@ -183,7 +231,28 @@ TablePtr Table::index_table(const std::string &db_name) {
 
     // get table property
     TableProperty index_tp(db_name, ".index", 2, cp_lst);
-    return std::make_shared<Table>();
+    auto index_ptr = std::make_shared<Table>(index_tp, true);
+    index_ptr->keys_index = std::make_shared<BpTree>(index_tp, 4);
+    return index_ptr;
+}
+
+TablePtr Table::reference_table(const std::string &db_name) {
+    // .reference table attributes:
+    //
+    // 0. t1 : Varchar(64)
+    // 1. t2 : Varchar(64)
+    // 
+    using namespace db_type;
+    // setting col property
+    TableProperty::ColPropertyList cp_lst;
+    ColProperty t1("t1", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), true);
+    cp_lst.push_back(t1);
+
+    ColProperty t2("t2", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), true);
+    cp_lst.push_back(t2);
+
+    TableProperty ref_tp(db_name, ".reference", 4, cp_lst);
+    return std::make_shared<Table>(ref_tp);
 }
 
 } // namespace sdb

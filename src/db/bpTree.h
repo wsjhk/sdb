@@ -35,10 +35,10 @@ public:
     BpTree &operator=(BpTree &&bpt)= delete;
     ~BpTree();
 
-    static void get(const TableProperty &property);
-    // static void drop(const TableProperty &property);
+    static std::shared_ptr<BpTree> build(const TableProperty &property);
+    void drop();
 
-    // sql
+    // op
     void insert(const Tuple &key, const Tuple &data);
     void remove(const Tuple &key);
     void update(const Tuple &key, const Tuple &data);

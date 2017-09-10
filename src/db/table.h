@@ -31,24 +31,27 @@ public:
     static void drop_table(const std::string &db_name, const std::string &table_name);
 
     // index
-    void create_index(const std::string &index_name, const std::list<std::string> &col_name_list);
-    void remove_index(const std::string &index_name);
+    // void create_index(const std::string &index_name, const std::list<std::string> &col_name_list);
+    // void remove_index(const std::string &index_name);
 
     // insert a tuple
     void insert(const Tuple &tuple);
 
     // remove by key
-    void remove(const Tuple &key);
+    void remove(const Tuple &keys);
+    // remove while predicate
     void remove(TuplePred pred);
 
     // can't update primary key, 
     // use insert/remove in primary index if need update key
     void update(const Tuple &new_tuple);
+    // update while predicate
+    void update(TuplePred pred);
 
     // find use primary index
-    Tuples find(const Tuple &key);
-    Tuples find_less(const Tuple &key, bool is_close);
-    Tuples find_greater(const Tuple &key, bool is_close);
+    Tuples find(const Tuple &keys);
+    Tuples find_less(const Tuple &keys, bool is_close);
+    Tuples find_greater(const Tuple &keys, bool is_close);
     Tuples find_range(const Tuple &beg, const Tuple &end, 
                       bool is_beg_close, bool is_end_close);
     // find use record
@@ -78,15 +81,15 @@ private:
     static TablePtr table_list_table(const std::string &db_name);
     static TablePtr col_list_table(const std::string &db_name);
     static TablePtr index_table(const std::string &db_name);
+    static TablePtr reference_table(const std::string &db_name);
 
-    TableProperty get_table_property(const std::string &table_name);
-
+    // TableProperty get_table_property(const std::string &table_name);
 
 private:
     TableProperty tp;
-    std::shared_ptr<BpTree> keys_index;
+    std::shared_ptr<BpTree> keys_index = nullptr;
     // std::vector<BpTree> bpt_index_lst;
-    static tbb::concurrent_unordered_map<std::pair<std::string, std::string>, TablePtr> table_map;
+    static std::map<std::pair<std::string, std::string>, TablePtr> table_map;
 };
 
 } // namespace sdb

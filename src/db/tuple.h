@@ -14,8 +14,13 @@ public:
     Tuple &operator=(const Tuple &);
     Tuple &operator=(Tuple &&);
 
-    // inde
+    // index
     db_type::ObjPtr operator[](Size size) {
+        assert(size >= 0 && size <= data.size());
+        return data[size];
+    }
+
+    db_type::ObjCntPtr operator[](Size size) const {
         assert(size >= 0 && size <= data.size());
         return data[size];
     }
@@ -31,7 +36,7 @@ public:
 
     // bytes
     Bytes en_bytes()const;
-    void de_bytes(const std::vector<std::pair<db_type::TypeTag, int>> &tag_sizes, const Bytes &bytes, Size offset);
+    void de_bytes(const std::vector<db_type::TypeInfo> &infos, const Bytes &bytes, Size offset);
 
     // push back
     void push_back(db_type::ObjCntPtr ptr){
@@ -44,7 +49,6 @@ public:
         }
     }
 
-    // TODO
     Tuple select(std::vector<Size> pos_lst)const;
 
 
@@ -83,7 +87,7 @@ public:
 
     // bytes
     Bytes en_bytes()const;
-    void de_bytes(const std::vector<std::pair<db_type::TypeTag, int>> &type_tags,const Bytes &bytes, int &offset) ;
+    void de_bytes(const std::vector<db_type::TypeInfo> &infos, const Bytes &bytes, int &offset) ;
 
     // debug
     void print()const;

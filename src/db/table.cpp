@@ -115,6 +115,15 @@ void Table::drop_table(const std::string &db_name, const std::string &table_name
     table_map.erase(it);
 }
 
+void Table::record_range(RecordOp op) {
+    BlockNum pos = tp.record_root;
+    while (pos != -1) {
+        auto ptr = std::make_shared<Record>(tp, pos);
+        op(ptr);
+        pos = ptr->get_next_record_num();
+    }
+}
+
 void Table::insert(const Tuple &tuple) {
     Tuple keys = tuple.select(tp.get_keys_pos());
     keys_index->insert(keys, tuple);
@@ -124,9 +133,23 @@ void Table::remove(const Tuple &keys) {
     keys_index->remove(keys);
 }
 
+void Table::remove(TuplePred pred) {
+    RecordOp f = [pred](RecordPtr ptr){
+        ptr->remove(pred);
+    };
+    record_range(f);
+}
+
 void Table::update(const Tuple &new_tuple) {
     Tuple keys = new_tuple.select(tp.get_keys_pos());
     keys_index->update(keys, new_tuple);
+}
+
+void Table::update(TuplePred pred, TupleOp op) {
+    RecordOp f = [pred, op](RecordPtr ptr){
+        ptr->update(pred, op);
+    };
+    record_range(f);
 }
 
 Tuples Table::find(const Tuple &keys) {
@@ -144,6 +167,14 @@ Tuples Table::find_greater(const Tuple &keys, bool is_close) {
 Tuples Table::find_range(const Tuple &beg, const Tuple &end, 
                   bool is_beg_close, bool is_end_close) {
     return keys_index->find_range(beg, end, is_beg_close, is_end_close);
+}
+
+Tuples Table::find(TuplePred pred) {
+    Tuples ts(tp.col_property_lst.size());
+    RecordOp f = [pred, &ts](RecordPtr ptr){
+        ts.append(ptr->find(pred));
+    };
+    record_range(f);
 }
 
 // ========== private function ========

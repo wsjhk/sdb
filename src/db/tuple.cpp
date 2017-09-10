@@ -31,14 +31,6 @@ Size Tuple::type_size()const {
     return sum;
 }
 
-Size Tuple::data_size()const {
-    Size sum = 0;
-    for (auto &&ptr : data) {
-        sum += ptr->get_size();
-    }
-    return sum;
-}
-
 bool Tuple::eq(const Tuple &tuple)const{
     if (data.size() != tuple.data.size()) return false;
 
@@ -66,9 +58,9 @@ Bytes Tuple::en_bytes()const {
     return sdb::en_bytes(data);
 }
 
-void Tuple::de_bytes(const std::vector<std::pair<db_type::TypeTag, int>> &tag_sizes, const Bytes &bytes, Size offset) {
-    for (auto &&[tag, size] : tag_sizes) {
-        ObjPtr ptr = db_type::get_default(tag, size);
+void Tuple::de_bytes(const std::vector<db_type::TypeInfo> &infos, const Bytes &bytes, Size offset) {
+    for (auto &&info : infos) {
+        ObjPtr ptr = db_type::get_default(info);
         ptr->de_bytes(bytes, offset);
         data.push_back(ptr);
     }
@@ -128,12 +120,20 @@ void Tuples::range(size_t beg, size_t len, std::function<void(Tuple)> fn) {
     }
 }
 
+Tuple Tuple::select(std::vector<Size> pos_lst)const {
+    Tuple tuple;
+    for (auto &&x : pos_lst) {
+        tuple.push_back(data[x]);
+    }
+    return tuple;
+}
+
 // bytes
 Bytes Tuples::en_bytes()const {
     return sdb::en_bytes(data);
 }
 
-void Tuples::de_bytes(const std::vector<std::pair<db_type::TypeTag, int>> &tag_sizes, const Bytes &bytes, int &offset) {
+void Tuples::de_bytes(const std::vector<db_type::TypeInfo> &infos, const Bytes &bytes, int &offset) {
     assert(tag_sizes.size() == col_num);
     data.clear();
     int len;
@@ -141,7 +141,7 @@ void Tuples::de_bytes(const std::vector<std::pair<db_type::TypeTag, int>> &tag_s
     assert(len >= 0 || len < BLOCK_SIZE);
     for (int i = 0; i < len; i++) {
         Tuple tuple;
-        tuple.de_bytes(tag_sizes, bytes, offset);
+        tuple.de_bytes(infos, bytes, offset);
         data.push_back(std::move(tuple));
     }
 }

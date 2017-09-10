@@ -37,6 +37,10 @@ public:
     // insert a tuple
     void insert(const Tuple &tuple);
 
+    using RecordPtr = std::shared_ptr<Record>;
+    using RecordOp = std::function<void(RecordPtr)>;
+    void record_range(RecordOp op);
+
     // remove by key
     void remove(const Tuple &keys);
     // remove while predicate
@@ -46,7 +50,7 @@ public:
     // use insert/remove in primary index if need update key
     void update(const Tuple &new_tuple);
     // update while predicate
-    void update(TuplePred pred);
+    void update(TuplePred pred, TupleOp Op);
 
     // find use primary index
     Tuples find(const Tuple &keys);

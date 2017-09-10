@@ -29,13 +29,22 @@ public:
     std::optional<BlockNum> insert(const Tuple &key, const Tuple &data);
     // remove
     void remove(const Tuple &key);
+    // TODO
+    void remove(TuplePred pred);
     // update
+    // return right pos if split
     std::optional<BlockNum> update(const Tuple &key, const Tuple& data);
+    // TODO
+    // return return rightmost pos if multi-split
+    std::optional<BlockNum> update(TuplePred pred, TupleOp op);
+
     //  find
     Tuples find_key(const Tuple &tuple);
     Tuples find_less(const Tuple &key, bool is_close)const;
     Tuples find_greater(const Tuple &key, bool is_close)const;
     Tuples find_range(const Tuple &beg, const Tuple &end, bool is_beg_close, bool is_end_close)const;
+    // TODO
+    Tuples find(TuplePred pred);
 
     // get
     Tuples get_all_tuple()const;

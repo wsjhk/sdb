@@ -34,6 +34,9 @@ using BlockOffset = Size;
 using Byte = char;
 using Bytes = std::vector<Byte>;
 
+// transaction
+using Tid = int64_t;
+
 // traits
 namespace Traits {
     // pair

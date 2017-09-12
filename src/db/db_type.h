@@ -90,9 +90,11 @@ public:
     }
 };
 
-// object alias
+// === object alias
+// obj ptr
 using ObjPtr = SP<Object>;
 using ObjCntPtr = SP<const Object>;
+
 // functional
 using ObjPred = std::function<bool(std::shared_ptr<const Object>)>;
 // using ObjMap = std::function<std::shared_ptr<Object>(std::shared_ptr<const Object>)>;

@@ -9,6 +9,8 @@ namespace sdb {
 class Tuple {
 public:
     Tuple(){}
+    // TODO
+    Tuple(std::initializer_list<db_type::ObjPtr> date);
     Tuple(const Tuple &tuple) {*this = tuple;}
     Tuple(Tuple &&tuple) {*this = std::move(tuple);}
     Tuple &operator=(const Tuple &);
@@ -50,7 +52,6 @@ public:
     }
 
     Tuple select(std::vector<Size> pos_lst)const;
-
 
 private:
     std::vector<db_type::ObjPtr> data;

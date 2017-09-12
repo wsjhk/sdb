@@ -5,64 +5,54 @@
 #include <unordered_set>
 #include <utility>
 #include "table.h"
-#include "../cpp_util/result.hpp"
+
+namespace sdb {
 
 class DB {
 public:
     // type
-    using TableNameSet = std::unordered_set<std::string>;
-    using Value = SDB::Type::Value;
-    using Tuple = SDB::Type::Tuple;
-    using TupleLst = SDB::Type::TupleLst;
+    using DBPtr = std::shared_ptr<DB>;
 
 public:
-    // get_db
+    DB(const std::string &db_name);
+
+    // db op
     static void create_db(const std::string &db_name);
-    static cpp_util::Result<DB*, std::string> get_db(const std::string &db_name);
-    static bool hasDatabase(const std::string &db_name);
     static void drop_db(const std::string &db_name);
-    std::string get_db_name()const {
-        return db_name;
-    }
-    void create_table(const SDB::Type::TableProperty &table_property);
-    void drop_table(const std::string &table_name);
-    void insert(const std::string &table_name, const SDB::Type::TupleData &tuple_data);
-    void remove(const std::string &table_name, const std::string &col_name, const Value &value);
-    void remove(const std::string &table_name, const std::string &col_name, SDB::Type::BVFunc predicate);
-    void update(const std::string &table_name, 
-                const std::string &pred_col_name, SDB::Type::BVFunc predicate,
-                const std::string &op_col_name, SDB::Type::VVFunc op);
-    DB::TupleLst find(const std::string &table_name,
-                      const std::string &col_name,
-                      const SDB::Type::Value &value);
-    DB::TupleLst find(const std::string &table_name,
-                      const std::string &col_name,
-                      std::function<bool(DB::Value)> predicate);
+
+    // table
+    void create_table(Tid t_id, const TableProperty &table_property);
+    void drop_table(Tid t_id, const std::string &table_name);
+    void insert(Tid t_id, const std::string &table_name, const Tuple &data);
+    void remove(Tid t_id, const std::string &table_name, const Tuple &key);
+    void remove(Tid t_id, const std::string &table_name, TuplePred pred);
+    void update(Tid t_id, const std::string &table_name, TuplePred predicate, TupleOp op);
+    Tuples find(Tid t_id, const std::string &table_name, const Tuple &key);
+    Tuples find(Tid t_id, const std::string &table_name, TuplePred pred);
 
 private:
-    DB()=delete;
-    DB(const std::string &db_name):db_name(db_name){
-        read_meta_data();
-    }
-
-    static std::unordered_map<std::string, DB> get_db_list();
-
-    static void write_meta_data(const std::string &db_name, const TableNameSet &set);
-    void read_meta_data();
-
-    static std::string get_meta_path(const std::string &db_name);
-
     // check integrity
-    template <typename T>
-    void check_referenced(const Table &table, T t);
-    void check_referencing(const Table &table, const SDB::Type::TupleData &tuple_data);
+    // template <typename T>
+    // void check_referenced(const Table &table, T t);
+    // void check_referencing(const Table &table, const SDB::Type::TupleData &tuple_data);
 
+    // add meta table to db_map
+    void add_table_list();
+    void add_col_list();
+//    void add_index();
+    void add_reference();
+    std::vector<std::string> table_name_lst(Tid tid)const;
+
+    TableProperty get_tp(Tid tid, const std::string &table_name);
 
 private:
-    struct Master;
-    static std::shared_ptr<Master> master;
     std::string db_name;
-    TableNameSet table_name_set;
+    // TODO concurrent map
+    // <name, tablePtr>
+    using SmTp = std::pair<std::shared_mutex, Table::TablePtr>;
+    static std::map<std::string, SmTp> db_map;
 };
+
+} // namespace sdb
 
 #endif //DB_H

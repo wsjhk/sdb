@@ -1,179 +1,187 @@
-//
-// Created by sven on 17-3-23.
-//
-
 #include "db.h"
+
 #include "io.h"
 #include "util.h"
 #include "table.h"
 #include "cache.h"
 
-using namespace SDB;
-using namespace cpp_util;
+namespace sdb {
 
-// ========== Master =======
-struct DB::Master {
-    std::unordered_map<std::string, DB> db_list;
-    Master():db_list(get_db_list()){}
-    ~Master()noexcept;
-};
+// static member
+std::map<std::string, DB::DBPtr> db_map = {};
 
-DB::Master::~Master()noexcept{
-    for (auto &&p: db_list) {
-        auto &&ps = p.second;
-        ps.write_meta_data(ps.db_name, ps.table_name_set);
-    }
-    db_list.clear();
+DB::DB(const std::string &db_name):db_name(db_name) {
+    add_table_list();
+    add_col_list();
+    // add_index();
+    add_reference();
 }
-
-std::shared_ptr<DB::Master> DB::master = std::make_shared<DB::Master>();
 
 // ========== Public =======
 void DB::create_db(const std::string &db_name) {
-    IO::create_dir(db_name);
-    IO::create_file(get_meta_path(db_name));
-    write_meta_data(db_name, TableNameSet());
-}
-
-Result<DB*, std::string> DB::get_db(const std::string &db_name) {
-    if (master->db_list.find(db_name) == master->db_list.end()) {
-        return Err<std::string>("Error: db not found!");
-    }
-    return Ok<DB*>(&master->db_list.at(db_name));
-}
-
-bool DB::hasDatabase(const std::string &db_name){
-    return get_db(db_name).has_value();
+    IO &io = IO::get();
+    io.create_dir(db_name);
+    io.create_file(db_name + "/block.sdb");
+    io.create_file(db_name + "/log.sdb");
 }
 
 void DB::drop_db(const std::string &db_name){
-    Cache &cache = Cache::make();
-    cache.pop_file(get_meta_path(db_name));
-    IO::remove_dir_force(db_name);
-    master->db_list.erase(db_name);
+    IO &io = IO::get();
+    io.remove_dir_force(db_name);
+    io.delete_file(db_name + "/block.sdb");
+    io.delete_file(db_name + "/log.sdb");
 }
 
-void DB::create_table(const SDB::Type::TableProperty &table_property) {
-    Table::create_table(table_property);
-    table_name_set.insert(table_property.table_name);
+// ========== private =======
+void DB::add_table_list() {
+    // .table_list table attributes:
+    //
+    // 0. table_name  : Varchar(64)
+    // 1. record_root : BigInt
+    // 1. keys_index_root  : BigInt
+    // 
+
+    using namespace db_type;
+    ColProperty table_name_col("table_name", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), 0, true);
+    ColProperty rr_cp("record_root", sdb::en_bytes(static_cast<char>(INT)), 1);
+    ColProperty ki_cp("keys_idx_root", sdb::en_bytes(static_cast<char>(INT)), 2);
+    TableProperty meta_tp(db_name, ".table_list", 0, 1, {table_name_col, rr_cp});
+
+    db_map[".table_list"].second = std::make_shared<Table>(meta_tp);
 }
 
-void DB::drop_table(const std::string &table_name) {
-    Table table(db_name, table_name);
-    if (table.is_referenced()) {
-        throw std::runtime_error("Error:[drop table] table already is referenced");
+void DB::add_col_list() {
+    // .col_list table attributes:
+    //
+    // 0. table_name  : Varchar(64)
+    // 1. col_name    : Varchar(64)
+    // 2. type_info   : Varchar(64)
+    // 3. order_num   : Char
+    // 4. is_key      : Char
+    // 5. is_not_null : Char
+    // 
+    using namespace db_type;
+    // setting col property
+    TableProperty::ColPropertyList cp_lst;
+    ColProperty table_name_cp("table_name", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), 0, true);
+    cp_lst.push_back(table_name_cp);
+
+    ColProperty col_name_cp("col_name", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), 1, true);
+    cp_lst.push_back(col_name_cp);
+
+    ColProperty type_info("type_info", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), 2);
+    cp_lst.push_back(type_info);
+
+    ColProperty order_num_cp("order_num", sdb::en_bytes(static_cast<char>(CHAR)), 3);
+    cp_lst.push_back(order_num_cp);
+
+    ColProperty is_key_cp("is_key", sdb::en_bytes(static_cast<char>(CHAR)), 4);
+    cp_lst.push_back(is_key_cp);
+
+    ColProperty is_not_null_cp("is_not_null", sdb::en_bytes(static_cast<char>(CHAR)), 5);
+    cp_lst.push_back(is_not_null_cp);
+
+    // get table property
+    TableProperty col_list_tp(db_name, ".col_list", 2, 3, cp_lst);
+    db_map[".col_list"].second = std::make_shared<Table>(col_list_tp);
+}
+
+// void DB::add_index() {
+//     // .index table attributes:
+//     //
+//     // 0. table_name : Varchar(64)
+//     // 1. index_name : Varchar(64)
+//     // 2. col_name   : Varchar(64)
+//     // 3. index_root : Int
+//     // 
+//     using namespace db_type;
+//     // setting col property
+//     TableProperty::ColPropertyList cp_lst;
+//     ColProperty table_name_cp("table_name", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), true);
+//     cp_lst.push_back(table_name_cp);
+// 
+//     ColProperty index_name_cp("index_name", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), true);
+//     cp_lst.push_back(index_name_cp);
+// 
+//     ColProperty col_name_cp("col_name", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), true);
+//     cp_lst.push_back(col_name_cp);
+// 
+//     ColProperty index_root_cp("index_root", sdb::en_bytes(static_cast<char>(INT)));
+//     cp_lst.push_back(index_root_cp);
+// 
+//     // get table property
+//     TableProperty index_tp(db_name, ".index", 4, 5, cp_lst);
+//     db_map[".index"].second = std::make_shared<Table>(index_tp);
+// }
+
+void DB::add_reference() {
+    // .reference table attributes:
+    //
+    // 0. t1 : Varchar(64)
+    // 1. t2 : Varchar(64)
+    // 
+    using namespace db_type;
+    // setting col property
+    TableProperty::ColPropertyList cp_lst;
+    ColProperty t1("t1", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), true);
+    cp_lst.push_back(t1);
+
+    ColProperty t2("t2", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), true);
+    cp_lst.push_back(t2);
+
+    TableProperty ref_tp(db_name, ".reference", 7, 8, cp_lst);
+    db_map[".reference"].second = std::make_shared<Table>(ref_tp);
+}
+
+TableProperty DB::get_tp(Tid tid, const std::string &table_name) {
+    // get record root and idx root;
+    db_map[".table_list"].first.lock_shared();
+    auto tl_ptr = db_map[".table_list"].second;
+    Tuple keys = {std::make_shared<db_type::Varchar>(64, table_name)};
+    auto tl_ts = tl_ptr->find(tid, keys);
+    BlockNum record_root, keys_idx_root;
+    Size offset = 0;
+    sdb::de_bytes(record_root, tl_ts.data[0][1]->en_bytes(), offset);
+    offset = 0;
+    sdb::de_bytes(keys_idx_root, tl_ts.data[0][2]->en_bytes(), offset);
+    db_map[".table_list"].first.unlock_shared();
+
+    // get col list
+    db_map[".col_list"].first.lock_shared();
+    auto cl_ptr = db_map[".col_list"].second;
+    auto cl_ts  = cl_ptr->find(tid, keys);
+    TableProperty::ColPropertyList col_lst;
+    for (auto &&tuple : cl_ts.data) {
+        std::string col_name;
+        sdb::de_bytes(col_name, tuple[1]->en_bytes(), (offset = 0));
+        Bytes type_info;
+        sdb::de_bytes(type_info, tuple[2]->en_bytes(), (offset = 0));
+        int8_t order_num;
+        sdb::de_bytes(order_num, tuple[3]->en_bytes(), (offset = 0));
+        bool is_key, is_not_null;
+        sdb::de_bytes(is_key, tuple[4]->en_bytes(), (offset = 0));
+        sdb::de_bytes(is_not_null, tuple[5]->en_bytes(), (offset = 0));
+        ColProperty cp(col_name, type_info, is_key, is_not_null);
+        col_lst.push_back(cp);
     }
-    for (auto &&item : table.get_referencing_map()) {
-        Table ref_table(db_name, item.first);
-        ref_table.remove_referenced(table_name);
+    db_map[".col_list"].first.unlock_shared();
+    return TableProperty(db_name, table_name, record_root, keys_idx_root, col_lst);
+}
+
+std::vector<std::string> DB::table_name_lst(Tid tid) const {
+    db_map[".table_list"].first.lock_shared();
+    auto tl_ptr = db_map[".table_list"].second;
+    Tuple keys = {std::make_shared<db_type::Varchar>(3, ".z")};
+    auto ts = tl_ptr->find_less(tid, keys, false);
+    db_map[".table_list"].first.unlock_shared();
+    std::vector<std::string> nl;
+    for (auto && tuple : ts.data) {
+        std::string name;
+        Size offset = 0;
+        sdb::de_bytes(name, tuple[0]->en_bytes(), offset);
+        nl.push_back(name);
     }
-    table_name_set.erase(table_name);
-    table.drop_table();
+    return nl;
 }
 
-void DB::insert(const std::string &table_name, const Type::TupleData& tuple_data) {
-    Table table(db_name, table_name);
-    check_referencing(table, tuple_data);
-    table.insert(tuple_data);
-}
-
-void DB::remove(const std::string &table_name,
-                const std::string &col_name,
-                const Value &value) {
-    Table table(db_name, table_name);
-    check_referenced(table, value);
-    table.remove(col_name, value);
-}
-
-void DB::remove(const std::string &table_name,
-                const std::string &col_name,
-                SDB::Type::BVFunc predicate) {
-    Table table(db_name, table_name);
-    check_referenced(table, predicate);
-    table.remove(col_name, predicate);
-}
-
-void DB::update(const std::string &table_name,
-                const std::string &pred_col_name, SDB::Type::BVFunc predicate,
-                const std::string &op_col_name, SDB::Type::VVFunc op) {
-    Table table(db_name, table_name);
-    TupleLst tuple_lst = table.find(pred_col_name, predicate);
-    bool is_op_key = op_col_name == table.get_key();
-    for (auto &&tuple_data : tuple_lst.data) {
-        if (is_op_key) {
-            Type::Pos col_pos = Type::TupleData::get_col_name_pos(table.get_col_name_lst(), op_col_name);
-            Value check_value = tuple_data.get_value(col_pos);
-            check_referenced(table, check_value);
-        }
-        check_referencing(table, tuple_data);
-    }
-    table.update(pred_col_name, predicate, op_col_name, op);
-}
-
-DB::TupleLst DB::find(const std::string &table_name,
-                      const std::string &col_name,
-                      const SDB::Type::Value &value) {
-    Table table(db_name, table_name);
-    return table.find(col_name, value);
-}
-
-DB::TupleLst DB::find(const std::string &table_name,
-                      const std::string &col_name,
-                      std::function<bool(DB::Value)> predicate) {
-    Table table(db_name, table_name);
-    return table.find(col_name, predicate);
-}
-
-// ========== Private =======
-std::unordered_map<std::string, DB> DB::get_db_list() {
-    std::unordered_map<std::string, DB> ret;
-    for(auto &&name: IO::get_db_name_list()) {
-        ret.insert_or_assign(name, DB(name));
-    }
-    return ret;
-}
-
-void DB::write_meta_data(const std::string &db_name, const TableNameSet &set) {
-    Type::Bytes bytes;
-    Function::bytes_append(bytes, set);
-    Cache::make().write_file(get_meta_path(db_name), bytes);
-}
-
-void DB::read_meta_data() {
-    Type::Bytes bytes = Cache::make().read_file(get_meta_path(db_name));
-    size_t offset = 0;
-    Function::de_bytes(table_name_set, bytes, offset);
-}
-
-std::string DB::get_meta_path(const std::string &db_name) {
-    return db_name + "/meta.sdb";
-}
-
-// check integrity
-template <typename T>
-void DB::check_referenced(const Table &table, T t){
-    auto referenced_map = table.get_referenced_map();
-    for (auto &&item : referenced_map) {
-        Table ref_table(db_name, item.first);
-        Type::TupleLst tuple_lst = ref_table.find(item.second, t);
-        if (!tuple_lst.data.empty()) {
-            throw std::runtime_error(
-                std::string("Error : referenced key")
-            );
-        }
-    }
-}
-
-void DB::check_referencing(const Table &table, const Type::TupleData &tuple_data){
-    auto referencing_map = table.get_referencing_map();
-    for (auto &&[refing_name, refed_name] : referencing_map) {
-        Table ref_table(db_name, refing_name);
-        Type::Value check_value = tuple_data.get_value(tuple_data.get_col_name_pos(table.get_col_name_lst(), refed_name));
-        Type::TupleLst tuple_lst = ref_table.find(ref_table.get_key(), check_value);
-        if (tuple_lst.data.empty()) {
-            throw std::runtime_error(
-                std::string("Error [db.insert]: can't fonud referencing key:")+check_value.get_string()
-            );
-        }
-    }
-}
+} // namespace sdb

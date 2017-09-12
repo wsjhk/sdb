@@ -178,10 +178,7 @@ Tuples Table::find(TuplePred pred) {
 }
 
 // ========== private function ========
-Table::Table(const TableProperty &tp, bool is_init = false):tp(tp){
-    if (is_init) {
-        return;
-    }
+Table::Table(const TableProperty &tp):tp(tp){
     auto ptr = table_map[{tp.db_name, ".index"}];
     Tuple tuple;
     tuple.push_back(std::make_shared<db_type::Varchar>(64, tp.table_name));

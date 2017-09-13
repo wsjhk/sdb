@@ -19,6 +19,8 @@ struct AstNode{
         :name(n), type(type), children(c){}
 };
 
+using AstNodePtr = std::shared_ptr<AstNode>;
+
 class Ast{
 public:
     Ast():root(nullptr){}

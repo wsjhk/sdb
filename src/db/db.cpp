@@ -4,17 +4,24 @@
 #include "util.h"
 #include "table.h"
 #include "cache.h"
+#include "block_alloc.h"
+
+#include <atomic>
 
 namespace sdb {
 
 // static member
-std::map<std::string, DB::DBPtr> db_map = {};
+std::map<std::string, DB::SmTp> table_map = {};
 
 DB::DB(const std::string &db_name):db_name(db_name) {
     add_table_list();
     add_col_list();
     // add_index();
     add_reference();
+    for (auto &&tn : table_name_lst(-1)) {
+        TableProperty tp = get_tp(-1, tn);
+        table_map[tn].second = std::make_shared<Table>(tp);
+    }
 }
 
 // ========== Public =======
@@ -47,7 +54,7 @@ void DB::add_table_list() {
     ColProperty ki_cp("keys_idx_root", sdb::en_bytes(static_cast<char>(INT)), 2);
     TableProperty meta_tp(db_name, ".table_list", 0, 1, {table_name_col, rr_cp});
 
-    db_map[".table_list"].second = std::make_shared<Table>(meta_tp);
+    table_map[".table_list"].second = std::make_shared<Table>(meta_tp);
 }
 
 void DB::add_col_list() {
@@ -83,7 +90,7 @@ void DB::add_col_list() {
 
     // get table property
     TableProperty col_list_tp(db_name, ".col_list", 2, 3, cp_lst);
-    db_map[".col_list"].second = std::make_shared<Table>(col_list_tp);
+    table_map[".col_list"].second = std::make_shared<Table>(col_list_tp);
 }
 
 // void DB::add_index() {
@@ -130,13 +137,13 @@ void DB::add_reference() {
     cp_lst.push_back(t2);
 
     TableProperty ref_tp(db_name, ".reference", 7, 8, cp_lst);
-    db_map[".reference"].second = std::make_shared<Table>(ref_tp);
+    table_map[".reference"].second = std::make_shared<Table>(ref_tp);
 }
 
 TableProperty DB::get_tp(Tid tid, const std::string &table_name) {
     // get record root and idx root;
-    db_map[".table_list"].first.lock_shared();
-    auto tl_ptr = db_map[".table_list"].second;
+    table_map[".table_list"].first.lock_shared();
+    auto tl_ptr = table_map[".table_list"].second;
     Tuple keys = {std::make_shared<db_type::Varchar>(64, table_name)};
     auto tl_ts = tl_ptr->find(tid, keys);
     BlockNum record_root, keys_idx_root;
@@ -144,11 +151,11 @@ TableProperty DB::get_tp(Tid tid, const std::string &table_name) {
     sdb::de_bytes(record_root, tl_ts.data[0][1]->en_bytes(), offset);
     offset = 0;
     sdb::de_bytes(keys_idx_root, tl_ts.data[0][2]->en_bytes(), offset);
-    db_map[".table_list"].first.unlock_shared();
+    table_map[".table_list"].first.unlock_shared();
 
     // get col list
-    db_map[".col_list"].first.lock_shared();
-    auto cl_ptr = db_map[".col_list"].second;
+    table_map[".col_list"].first.lock_shared();
+    auto cl_ptr = table_map[".col_list"].second;
     auto cl_ts  = cl_ptr->find(tid, keys);
     TableProperty::ColPropertyList col_lst;
     for (auto &&tuple : cl_ts.data) {
@@ -164,16 +171,16 @@ TableProperty DB::get_tp(Tid tid, const std::string &table_name) {
         ColProperty cp(col_name, type_info, is_key, is_not_null);
         col_lst.push_back(cp);
     }
-    db_map[".col_list"].first.unlock_shared();
+    table_map[".col_list"].first.unlock_shared();
     return TableProperty(db_name, table_name, record_root, keys_idx_root, col_lst);
 }
 
 std::vector<std::string> DB::table_name_lst(Tid tid) const {
-    db_map[".table_list"].first.lock_shared();
-    auto tl_ptr = db_map[".table_list"].second;
+    table_map[".table_list"].first.lock_shared();
+    auto tl_ptr = table_map[".table_list"].second;
     Tuple keys = {std::make_shared<db_type::Varchar>(3, ".z")};
     auto ts = tl_ptr->find_less(tid, keys, false);
-    db_map[".table_list"].first.unlock_shared();
+    table_map[".table_list"].first.unlock_shared();
     std::vector<std::string> nl;
     for (auto && tuple : ts.data) {
         std::string name;
@@ -182,6 +189,57 @@ std::vector<std::string> DB::table_name_lst(Tid tid) const {
         nl.push_back(name);
     }
     return nl;
+}
+
+
+void DB::create_table(Tid tid, const TableProperty &tp) {
+    // insert table map
+    auto &[tm_mt, tm_ptr] = table_map[tp.table_name];
+    bool res = tm_mt.try_lock();
+    if (!res){
+        throw std::runtime_error("table existed");
+    } 
+    if (tm_ptr != nullptr) {
+        throw std::runtime_error("table existed");
+    }
+    tm_ptr = std::make_shared<Table>(tp);
+
+    // table name
+    auto table_name_ptr = std::make_shared<db_type::Varchar>(64, tp.table_name);
+
+    // col list
+    table_map[".col_list"].first.lock_shared();
+    auto col_list_ptr = table_map[".col_list"].second;
+    int8_t order_num = 0;
+    for (auto &&cl : tp.col_property_lst) {
+        Tuple cl_tuple;
+        cl_tuple.push_back(table_name_ptr->clone());
+        // col name
+        cl_tuple.push_back(std::make_shared<db_type::Varchar>(64, cl.col_name));
+        // type info
+        cl_tuple.push_back(std::make_shared<db_type::Varchar>(64, cl.type_info));
+        // order num
+        cl_tuple.push_back(std::make_shared<db_type::Char>(order_num));
+        order_num++;
+        // is key
+        cl_tuple.push_back(std::make_shared<db_type::Char>(cl.is_key));
+        // is not null
+        cl_tuple.push_back(std::make_shared<db_type::Char>(cl.is_not_null));
+        col_list_ptr->insert(tid, cl_tuple);
+    }
+    table_map[".col_list"].first.unlock_shared();
+
+    // table list
+    Tuple tl_tuple;
+    tl_tuple.push_back(table_name_ptr->clone());
+    tl_tuple.push_back(std::make_shared<db_type::BigInt>(tp.record_root));
+    tl_tuple.push_back(std::make_shared<db_type::BigInt>(tp.keys_idx_root));
+    auto &[tl_mt, tl_ptr] = table_map[".table_list"];
+    tl_mt.lock_shared();
+    tl_ptr->insert(tid, tl_tuple);
+    tl_mt.unlock_shared();
+
+    tm_mt.unlock();
 }
 
 } // namespace sdb

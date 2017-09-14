@@ -187,13 +187,19 @@ std::vector<std::string> DB::table_name_lst(TransInfo t_info) {
 
 void DB::create_table(TransInfo t_info, const TableProperty &tp) {
     // insert table map
-    auto it = t_snapshot[t_info].find(tp.table_name);
-    if (it != t_snapshot[t_info].end()) {
+    auto &[lock_stat, ptr] = t_snapshot[t_info][tp.table_name];
+    if (lock_stat == 0) {
+        lock_stat = -2;
+        mutex_map[tp.table_name].lock();
+        lock_stat = 2;
+        ptr = table_map[tp.table_name];
+    } else {
         throw TableExisted(tp.table_name);
     }
 
-    mutex_map[tp.table_name].lock();
-    t_snapshot[t_info][tp.table_name].first = true;
+    if (ptr != nullptr) {
+        throw TableExisted(tp.table_name);
+    }
 
     // table name
     auto table_name_ptr = std::make_shared<db_type::Varchar>(64, tp.table_name);

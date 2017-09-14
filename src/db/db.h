@@ -13,7 +13,6 @@ namespace sdb {
 class DB {
 public:
     // type
-    // using DBPtr = std::shared_ptr<DB>;
     using TablePtr = std::shared_ptr<Table>;
 
 public:

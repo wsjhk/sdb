@@ -27,27 +27,19 @@ struct TableExisted : public TableError {
 
 class Table {
 public:
-    using TablePtr = std::shared_ptr<Table>;
-
-    static void create_table(TransInfo ti, const TableProperty &property);
-    void drop_table(TransInfo ti, const std::string &db_name, const std::string &table_name);
-
-    // meta table
-    static TablePtr table_list_table(const std::string &db_name);
-    static TablePtr col_list_table(const std::string &db_name);
-    static TablePtr index_table(const std::string &db_name);
-    static TablePtr reference_table(const std::string &db_name);
+    Table()= delete;
+    Table(const TableProperty &tp):tp(tp), keys_index(std::make_shared<BpTree>(tp)){}
 
     // index
     // void create_index(TransInfo ti, const std::string &index_name, const std::list<std::string> &col_name_list);
     // void remove_index(TransInfo ti, const std::string &index_name);
 
     // insert a tuple
-    void insert(TransInfo ti, const Tuple &tuple);
+    void insert(TransInfo t_info, const Tuple &tuple);
 
     using RecordPtr = std::shared_ptr<Record>;
     using RecordOp = std::function<void(RecordPtr)>;
-    void record_range(RecordOp op);
+    void record_range(TransInfo t_info, RecordOp op);
 
     // remove by key
     void remove(TransInfo ti, const Tuple &keys);
@@ -64,19 +56,13 @@ public:
     Tuples find(TransInfo ti, const Tuple &keys);
     Tuples find_less(TransInfo ti, const Tuple &keys, bool is_close);
     Tuples find_greater(TransInfo ti, const Tuple &keys, bool is_close);
-    Tuples find_range(TransInfo ti, const Tuple &beg, const Tuple &end, 
-                      bool is_beg_close, bool is_end_close);
+    Tuples find_range(TransInfo ti, const Tuple &beg, const Tuple &end, bool is_beg_close, bool is_end_close);
     // find use record
     Tuples find(TransInfo ti, TuplePred pred);
 
-    void add_referencing(TransInfo ti, const std::string &table_name, const std::string &col_name);
-    void add_referenced(TransInfo ti, const std::string &table_name, const std::string &col_name);
-    void remove_referencing(TransInfo ti, const std::string &table_name);
-    void remove_referenced(TransInfo ti, const std::string &table_name);
-
-    bool is_referenced()const;
-    bool is_referencing()const;
-    bool is_referencing(const std::string &table_name)const;
+    // bool is_referenced()const;
+    // bool is_referencing()const;
+    // bool is_referencing(const std::string &table_name)const;
 
     std::unordered_map<std::string, std::string> get_referenced_map()const;
     std::unordered_map<std::string, std::string> get_referencing_map()const;
@@ -84,20 +70,14 @@ public:
     std::vector<std::string> get_col_name_lst()const{return tp.get_col_name_lst();}
 
 private:
-    Table()= delete;
-    Table(const TableProperty &tp, bool is_init);
-
     bool is_has_index(const std::string &col_name)const;
-
-    // TableProperty get_table_property(const std::string &table_name);
 
 public:
     TableProperty tp;
 private:
-    std::shared_ptr<BpTree> keys_index = nullptr;
-    // db_name, table_name
+    const std::shared_ptr<BpTree> keys_index;
 };
 
 } // namespace sdb
 
-#endif
+#endif // DB_TABLE_H

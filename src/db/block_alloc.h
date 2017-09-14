@@ -15,6 +15,7 @@ public:
     }
 
     BlockNum new_block(const std::string &db_name);
+    BlockNum new_temp_block(const std::string &db_name);
     void free_block(const std::string &db_name, BlockNum block_num);
 
 private:

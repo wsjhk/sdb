@@ -16,7 +16,7 @@ namespace sdb {
 class Record {
 public:
     Record()= delete;
-    explicit Record(TableProperty, BlockNum);
+    explicit Record(TransInfo info, TableProperty, BlockNum);
 
     bool is_less()const;
     bool is_full()const;
@@ -69,6 +69,7 @@ private: // function
     }
 
 private: // member
+    TransInfo t_info;
     TableProperty tp;
     BlockNum block_num;
     BlockNum next_record_num = -1;

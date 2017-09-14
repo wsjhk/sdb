@@ -2,8 +2,8 @@
 // Created by sven on 17-3-18.
 //
 
-#ifndef MAIN_CACHE_H
-#define MAIN_CACHE_H
+#ifndef DB_CACHE_H
+#define DB_CACHE_H
 
 #include <memory>
 #include <list>
@@ -49,7 +49,7 @@ public:
     BlockCache &operator=(BlockCache &&)=delete;
 
     // get and put
-    Bytes get(const std::string &path, size_t block_num);
+    Bytes get(const std::string &path, BlockNum block_num);
     void put(const std::string &path, size_t block_num, const Bytes &data);
 
     // sync all cache
@@ -94,4 +94,4 @@ public:
 
 } // namespace sdb
 
-#endif //CACHE_H
+#endif // DB_CACHE_H

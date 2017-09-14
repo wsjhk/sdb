@@ -36,9 +36,11 @@ using Bytes = std::vector<Byte>;
 
 // transaction
 using Tid = int64_t;
+class Snapshot;
 struct TransInfo {
     Tid id = -1;
     enum Level : char { READ, R_READ } level = READ;
+    std::shared_ptr<Snapshot> s_ptr;
 };
 
 // traits

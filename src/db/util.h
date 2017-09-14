@@ -2,8 +2,8 @@
 // Created by sven on 17-2-19.
 //
 
-#ifndef UTIL_H
-#define UTIL_H
+#ifndef DB_UTIL_H
+#define DB_UTIL_H
 
 #include <vector>
 #include <string>
@@ -36,6 +36,10 @@ using Bytes = std::vector<Byte>;
 
 // transaction
 using Tid = int64_t;
+struct TransInfo {
+    Tid id = -1;
+    enum Level : char { READ, R_READ } level = READ;
+};
 
 // traits
 namespace Traits {
@@ -208,4 +212,4 @@ inline void bytes_append(Bytes &bytes, Args... args) {
 
 } // SDB namespace
 
-#endif //UTIL_H
+#endif // DB_UTIL_H

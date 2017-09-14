@@ -1,10 +1,11 @@
-#ifndef DB_H
-#define DB_H
+#ifndef DB_DB_H
+#define DB_DB_H
 
 #include <string>
 #include <unordered_set>
 #include <utility>
 #include "table.h"
+#include <boost/thread.hpp>
 #include "../sql/ast.h"
 
 namespace sdb {
@@ -14,7 +15,6 @@ public:
     // type
     // using DBPtr = std::shared_ptr<DB>;
     using TablePtr = std::shared_ptr<Table>;
-    using SmTp = std::pair<std::shared_mutex, TablePtr>;
 
 public:
     DB(const std::string &db_name);
@@ -33,23 +33,43 @@ private:
     // add meta table to db_map
     void add_table_list();
     void add_col_list();
-//    void add_index();
-    void add_reference();
-    std::vector<std::string> table_name_lst(Tid tid)const;
+    // void add_index();
+    // void add_reference();
+    std::vector<std::string> table_name_lst(TransInfo ti);
 
-    TableProperty get_tp(Tid tid, const std::string &table_name);
+    // tp
+    TableProperty get_tp(TransInfo ti, const std::string &table_name);
 
     // table
-    void create_table(Tid t_id, const TableProperty &tp);
-    void drop_table(Tid t_id, const std::string &table_name);
+    void create_table(TransInfo ti, const TableProperty &tp);
+    void drop_table(TransInfo ti, const std::string &table_name);
+
+    // transaction check
+    void trans_check(TransInfo t_info);
+
+    // op
+    TransInfo begin();
+    void commit(TransInfo t_info);
 
 private:
     std::string db_name;
     // TODO concurrent map
+    // TODO deadlock maybe
     // <name, tablePtr>
-    static std::map<std::string, SmTp> table_map;
+    std::map<std::string, boost::upgrade_mutex> mutex_map;
+    std::map<std::string, TablePtr> table_map;
+    // int8_t => 
+    // -3 : apply upgrade_lock
+    // -2 : apply hared_lock
+    // -1 : apply unque_lock
+    // 0  : init
+    // 1  : has shared_lock
+    // 2  : has unique_lock
+    //
+    // <transaction info, <table name, <lock info, table ptr>>>
+    std::map<TransInfo, std::map<std::string, std::pair<int8_t, TablePtr>>> t_snapshot;
 };
 
 } // namespace sdb
 
-#endif //DB_H
+#endif //DB_DB_H

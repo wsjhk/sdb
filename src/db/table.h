@@ -20,12 +20,17 @@ struct TableNotFound : public TableError {
         :TableError(cpp_util::format("table [%s] not found", table_name)) {}
 };
 
+struct TableExisted : public TableError {
+    TableExisted(const std::string &table_name)
+        :TableError(cpp_util::format("table [%s] existed", table_name)) {}
+};
+
 class Table {
 public:
     using TablePtr = std::shared_ptr<Table>;
 
-    static void create_table(Tid t_id, const TableProperty &property);
-    void drop_table(Tid t_id, const std::string &db_name, const std::string &table_name);
+    static void create_table(TransInfo ti, const TableProperty &property);
+    void drop_table(TransInfo ti, const std::string &db_name, const std::string &table_name);
 
     // meta table
     static TablePtr table_list_table(const std::string &db_name);
@@ -34,40 +39,40 @@ public:
     static TablePtr reference_table(const std::string &db_name);
 
     // index
-    // void create_index(Tid t_id, const std::string &index_name, const std::list<std::string> &col_name_list);
-    // void remove_index(Tid t_id, const std::string &index_name);
+    // void create_index(TransInfo ti, const std::string &index_name, const std::list<std::string> &col_name_list);
+    // void remove_index(TransInfo ti, const std::string &index_name);
 
     // insert a tuple
-    void insert(Tid t_id, const Tuple &tuple);
+    void insert(TransInfo ti, const Tuple &tuple);
 
     using RecordPtr = std::shared_ptr<Record>;
     using RecordOp = std::function<void(RecordPtr)>;
     void record_range(RecordOp op);
 
     // remove by key
-    void remove(Tid t_id, const Tuple &keys);
+    void remove(TransInfo ti, const Tuple &keys);
     // remove while predicate
-    void remove(Tid t_id, TuplePred pred);
+    void remove(TransInfo ti, TuplePred pred);
 
     // can't update primary key, 
     // use insert/remove in primary index if need update key
-    void update(Tid t_id, const Tuple &new_tuple);
+    void update(TransInfo ti, const Tuple &new_tuple);
     // update while predicate
-    void update(Tid t_id, TuplePred pred, TupleOp Op);
+    void update(TransInfo ti, TuplePred pred, TupleOp Op);
 
     // find use primary index
-    Tuples find(Tid t_id, const Tuple &keys);
-    Tuples find_less(Tid t_id, const Tuple &keys, bool is_close);
-    Tuples find_greater(Tid t_id, const Tuple &keys, bool is_close);
-    Tuples find_range(Tid t_id, const Tuple &beg, const Tuple &end, 
+    Tuples find(TransInfo ti, const Tuple &keys);
+    Tuples find_less(TransInfo ti, const Tuple &keys, bool is_close);
+    Tuples find_greater(TransInfo ti, const Tuple &keys, bool is_close);
+    Tuples find_range(TransInfo ti, const Tuple &beg, const Tuple &end, 
                       bool is_beg_close, bool is_end_close);
     // find use record
-    Tuples find(Tid t_id, TuplePred pred);
+    Tuples find(TransInfo ti, TuplePred pred);
 
-    void add_referencing(Tid t_id, const std::string &table_name, const std::string &col_name);
-    void add_referenced(Tid t_id, const std::string &table_name, const std::string &col_name);
-    void remove_referencing(Tid t_id, const std::string &table_name);
-    void remove_referenced(Tid t_id, const std::string &table_name);
+    void add_referencing(TransInfo ti, const std::string &table_name, const std::string &col_name);
+    void add_referenced(TransInfo ti, const std::string &table_name, const std::string &col_name);
+    void remove_referencing(TransInfo ti, const std::string &table_name);
+    void remove_referenced(TransInfo ti, const std::string &table_name);
 
     bool is_referenced()const;
     bool is_referencing()const;
@@ -86,8 +91,9 @@ private:
 
     // TableProperty get_table_property(const std::string &table_name);
 
-private:
+public:
     TableProperty tp;
+private:
     std::shared_ptr<BpTree> keys_index = nullptr;
     // db_name, table_name
 };

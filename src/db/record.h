@@ -10,13 +10,15 @@
 #include "db_type.h"
 #include "tuple.h"
 #include "cache.h"
+#include "io.h"
+#include "block_alloc.h"
 
 namespace sdb {
 
 class Record {
 public:
     Record()= delete;
-    explicit Record(TransInfo info, TableProperty, BlockNum);
+    Record(TransInfo info, TableProperty, BlockNum);
 
     bool is_less()const;
     bool is_full()const;
@@ -33,7 +35,7 @@ public:
     void remove(TuplePred pred);
     // update
     // return right pos if split
-    std::optional<BlockNum> update(const Tuple &key, const Tuple& data);
+    std::optional<BlockNum> update(const Tuple &key, const std::string &col_name, db_type::ObjCntPtr new_val);
     // TODO
     // return return rightmost pos if multi-split
     std::optional<BlockNum> update(TuplePred pred, TupleOp op);
@@ -51,16 +53,8 @@ public:
     BlockNum get_block_num()const {return block_num;}
     BlockNum get_next_record_num()const {return block_num;}
 
-    // tuple
-    void push_tuple(const Tuple &tuple);
-    void push_tuple(Tuple &&tuple);
-
     // sync
-    void sync_disk() const;
-    void sync_cache() const;
-
-    // create and drop
-    static Record create(const TableProperty &table_property, BlockNum next_record_num);
+    void sync() const;
 
 private: // function
     Size get_bytes_size()const;
@@ -73,8 +67,9 @@ private: // member
     TableProperty tp;
     BlockNum block_num;
     BlockNum next_record_num = -1;
+
 public:
-    Tuples tuples;
+    std::list<std::pair<Vid, Tuple>> record_lst;
 };
 
 } // namespace sdb

@@ -34,6 +34,7 @@ void Snapshot::commit() {
     for (auto &&[old_num, pair] : block_map) {
         auto [is_record, new_num] = pair;
         if (is_record) {
+            // Record record();
             // sync record
         } else {
             // sync index

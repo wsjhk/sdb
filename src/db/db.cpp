@@ -6,8 +6,6 @@
 #include "cache.h"
 #include "block_alloc.h"
 
-#include <atomic>
-
 namespace sdb {
 
 DB::DB(const std::string &db_name):db_name(db_name) {

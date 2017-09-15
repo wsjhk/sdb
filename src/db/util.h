@@ -35,7 +35,11 @@ using Byte = char;
 using Bytes = std::vector<Byte>;
 
 // transaction
+// Tid => transaction id
 using Tid = int64_t;
+// Vid => version id
+using Vid = int64_t;
+// Snapshot
 class Snapshot;
 struct TransInfo {
     Tid id = -1;

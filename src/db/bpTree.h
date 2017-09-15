@@ -65,7 +65,7 @@ private:
     }
 
 private:
-    const TableProperty tp;
+    TableProperty tp;
     // TODO concurrent map
     std::unordered_map<BlockNum, std::mutex> mutex_map;
     // std::mutex global_mutex;

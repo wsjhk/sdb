@@ -18,10 +18,10 @@ using db_type::ObjCntPtr;
 
 // --------------- Function ---------------
 // ========== BpTree Function =========
-void BpTree::insert(const Tuple &key, const Tuple &data) {
+void BpTree::insert(TransInfo t_info, const Tuple &key, const Tuple &data) {
     auto lst = search_path(key);
     BlockNum record_pos = lst.back();
-    Record record(tp, record_pos);
+    Record record(t_info, tp, record_pos);
     auto res = record.insert(key, data);
     if (!res.has_value()) return;
 
@@ -31,77 +31,77 @@ void BpTree::insert(const Tuple &key, const Tuple &data) {
 // remove record only, 
 // we don't delete record block though block is empty,
 // so B+Tree node don't need merge
-void BpTree::remove(const Tuple &key) {
+void BpTree::remove(TransInfo t_info, const Tuple &key) {
     auto lst = search_path(key);
     auto record_pos = lst.back();
-    Record record(tp, record_pos);
+    Record record(t_info, tp, record_pos);
     record.remove(key);
 }
 
-void BpTree::update(const Tuple &key, const Tuple &data) {
+void BpTree::update(TransInfo t_info, const Tuple &key, const Tuple &data) {
     auto lst = search_path(key);
     auto record_pos = lst.back();
     lst.pop_back();
-    Record record(tp, record_pos);
+    Record record(t_info, tp, record_pos);
     std::optional<BlockNum> res = record.update(key, data);
     if (!res.has_value()) return;
 
     bubble_split(std::move(lst), key, res.value());
 }
 
-Tuples BpTree::find_key(const Tuple &key)const {
+Tuples BpTree::find_key(TransInfo t_info, const Tuple &key)const {
     auto lst = search_path(key);
-    Record record(tp, lst.back());
+    Record record(t_info, tp, lst.back());
     return record.find_key(key);
 }
 
 // Tuples BpTree::find_pre_key(const Tuple &key)const {
 // }
 
-Tuples BpTree::find_less(const Tuple &key, bool is_close)const {
+Tuples BpTree::find_less(TransInfo t_info, const Tuple &key, bool is_close)const {
     Tuples ts(tp.col_property_lst.size());
     auto mid_pos = search_path(key).back();
-    Record record(tp, tp.record_root);
+    Record record(t_info, tp, tp.record_root);
     while (record.get_block_num() != mid_pos) {
         ts.append(record.get_all_tuple());
-        record = Record(tp, record.get_block_num());
+        record = Record(t_info, tp, record.get_block_num());
     }
     ts.append(record.find_less(key, is_close));
     return ts;
 }
 
-Tuples BpTree::find_greater(const Tuple &key, bool is_close)const {
+Tuples BpTree::find_greater(TransInfo t_info, const Tuple &key, bool is_close)const {
     Tuples ts(tp.col_property_lst.size());
     auto pos = search_path(key).back();
-    Record record(tp, pos);
+    Record record(t_info, tp, pos);
     ts.append(record.find_greater(key, is_close));
     while (record.get_next_record_num() != -1) {
         assert(record.get_next_record_num() != -1);
-        record = Record(tp, record.get_block_num());
+        record = Record(t_info, tp, record.get_block_num());
         ts.append(record.get_all_tuple());
     }
     return ts;
 }
 
-Tuples BpTree::find_range(const Tuple &beg, const Tuple &end, bool is_beg_close, bool is_end_close)const {
+Tuples BpTree::find_range(TransInfo t_info, const Tuple &beg, const Tuple &end, bool is_beg_close, bool is_end_close)const {
     assert(beg <= end);
 
     Tuples ts(tp.col_property_lst.size());
     auto beg_pos = search_path(beg).back();
     auto end_pos = search_path(end).back();
-    Record record(tp, beg_pos);
+    Record record(t_info, tp, beg_pos);
     if (beg_pos == end_pos) {
         return record.find_range(beg, end, is_beg_close, is_end_close);
     }
 
     // being block
     ts.append(record.find_greater(beg, is_beg_close));
-    record = Record(tp, record.get_block_num());
+    record = Record(t_info, tp, record.get_block_num());
     // inter block
     while (record.get_block_num() != end_pos) {
         assert(record.get_next_record_num() != -1);
         ts.append(record.get_all_tuple());
-        record = Record(tp, record.get_block_num());
+        record = Record(t_info, tp, record.get_block_num());
     }
     // end block
     ts.append(record.find_less(end, is_end_close));
@@ -114,7 +114,7 @@ std::string BpTree::index_path()const {
 
 std::vector<BlockNum> BpTree::search_path(const Tuple &key)const {
     std::vector<BlockNum> lst;
-    BptNode node = BptNode::get(tp, root_pos);
+    BptNode node = BptNode::get(tp, tp.keys_idx_root);
     while (true) {
         lst.push_back(node.file_pos);
         auto [key_it, pos_it] = node.search_less_or_eq_key(key);
@@ -140,14 +140,14 @@ void BpTree::bubble_split(std::vector<BlockNum> &&lst, const Tuple &key, BlockNu
         if (node.is_full()) {
             // split and sync 
             auto [right_node_pos, min_key] = node.split();
-            if (node.file_pos == root_pos) {
+            if (node.file_pos == tp.keys_idx_root) {
                 BptNode root_node = BptNode::new_node(tp);
                 root_node.is_leaf = false;
                 root_node.key_lst.push_back(min_key);
                 root_node.pos_lst.push_back(node.file_pos);
                 root_node.pos_lst.push_back(right_node_pos);
                 root_node.sync();
-                root_pos = root_node.file_pos;
+                tp.keys_idx_root = root_node.file_pos;
                 mutex_map[node.file_pos].unlock();
                 return;
             }

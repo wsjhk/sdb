@@ -1,5 +1,5 @@
 #ifndef DB_SNAPSHOT_H
-#define DB_SNAPSHOT_H
+#define DB_SNAPSHOT_H 
 
 #include <map>
 
@@ -15,6 +15,8 @@ public:
     Snapshot(const std::string &db_name, TransInfo t_info):db_name(db_name), t_info(t_info){}
     Bytes read_block(BlockNum block_num, bool is_record);
     void write_block(BlockNum block_num, const Bytes &bytes, bool is_record);
+    void rollback();
+    void commit();
 
 private:
     std::string block_path()const {

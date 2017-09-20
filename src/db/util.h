@@ -39,13 +39,16 @@ using Bytes = std::vector<Byte>;
 using Tid = int64_t;
 // Vid => version id
 using Vid = int64_t;
-// Snapshot
+// transinfo
 class Snapshot;
+class Tlog;
 struct TransInfo {
     Tid id = -1;
     enum Level : char { READ, R_READ } level = READ;
     std::shared_ptr<Snapshot> s_ptr;
+    std::shared_ptr<Tlog> t_ptr;
 };
+
 
 // traits
 namespace Traits {

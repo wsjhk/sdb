@@ -8,7 +8,7 @@
 
 namespace sdb {
 
-DB::DB(const std::string &db_name):db_name(db_name) {
+DB::DB(const std::string &db_name):db_name(db_name), t_log(db_name) {
     add_table_list();
     add_col_list();
     // add_index();
@@ -256,6 +256,60 @@ void DB::drop_table(TransInfo t_info, const std::string &table_name) {
 
     // table list
     table_map[".table_list"]->remove(t_info, table_name_key);
+}
+
+//  ===== TransInfo =====
+Tid DB::get_new_tid() {
+    Tid old_t_id = atomic_t_id;
+    Tid new_t_id = old_t_id + 1;
+    while (!atomic_t_id.compare_exchange_weak(old_t_id, new_t_id)) {
+        new_t_id = old_t_id + 1;
+    }
+    return old_t_id;
+}
+
+TransInfo DB::begin(Tid t_id) {
+    Tid info_t_id = t_id;
+    if (t_id == -1) {
+        info_t_id = get_new_tid();
+    }
+}
+
+//  ===== log =====
+void DB::log_redo() {
+    std::ifstream in(db_name + "/log.sdb");
+    while (!in.eof()) {
+        auto &&[t_id, l_type, data] = t_log.get_log_info(in);
+        switch (l_type) {
+            case Tlog::BEGIN:
+                log_redo_begin(t_id);
+                break;
+            case Tlog::COMMIT:
+                log_redo_commit(t_id);
+                break;
+            case Tlog::ROLLBACK:
+                log_redo_rollback(t_id);
+                break;
+            case Tlog::UPDATE:
+                log_redo_update(t_id, data);
+                break;
+            case Tlog::INSERT:
+                log_redo_insert(t_id, data);
+                break;
+            case Tlog::REMOVE:
+                log_redo_remove(t_id, data);
+                break;
+            default:
+                assert(false);
+                break;
+        }
+    }
+}
+
+void DB::log_undo() {
+}
+
+void DB::log_redo_begin(Tid t_id) {
 }
 
 } // namespace sdb

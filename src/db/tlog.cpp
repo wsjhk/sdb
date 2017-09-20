@@ -74,8 +74,7 @@ void Tlog::remove(Tid t_id, const TableProperty &tp, const Tuple &keys) {
 // ========== private =========
 void Tlog::write(const std::string &db_name, const Bytes &bytes) {
     // lock
-    auto &[mt, l_id] = db_mt[db_name];
-    std::lock_guard<std::mutex> lg(mt);
+    std::lock_guard<std::mutex> lg(mutex);
     Size log_size = sizeof(Tid) + bytes.size();
     Bytes log_len_btyes = sdb::en_bytes(log_size);
     sdb::bytes_append(log_len_btyes, l_id);

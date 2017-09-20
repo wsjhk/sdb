@@ -30,6 +30,9 @@ void Snapshot::write_block(BlockNum block_num, const Bytes &bytes, bool is_recor
     block_cache.put(block_path(), num, bytes);
 }
 
+void Snapshot::rollback(){
+}
+
 void Snapshot::commit() {
     for (auto &&[old_num, pair] : block_map) {
         auto [is_record, new_num] = pair;

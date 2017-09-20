@@ -24,11 +24,7 @@ public:
     };
 
 public:
-    static Tlog &get() {
-        static Tlog t_log;
-        return t_log;
-    }
-
+    Tlog(const std::string &db_name):db_name(db_name){}
     void begin(Tid t_id, const std::string &db_name);
     void commit(Tid t_id, const std::string &db_name);
     void rollback(Tid t_id, const std::string &db_name);
@@ -36,49 +32,17 @@ public:
     void insert(Tid t_id, const TableProperty &tp, const Tuple &data);
     void remove(Tid t_id, const TableProperty &tp, const Tuple &keys);
 
-    template <typename F>
-    void redo(const std::string &db_name, F get_table_ptr);
-    template <typename F>
-    void undo(F get_table_ptr);
+    std::tuple<Tid, LogType, Bytes> get_log_info(std::ifstream &in);
 
 private:
-    Tlog(){}
 
-    std::tuple<Tid, LogType, Bytes> get_log_info(std::ifstream &in);
     void write(const std::string &db_name, const Bytes &bytes);
 
 private:
-    // <db_name, <mutex, log id>>
-    static std::map<std::string, std::pair<std::mutex, Lid>> db_mt;
+    std::string db_name;
+    std::mutex mutex;
+    Tid l_id;
 };
-
-template <typename F>
-void Tlog::redo(const std::string &db_name, F get_table_ptr) {
-    std::ifstream in(db_name + "/log.sdb");
-    while (!in.eof()) {
-        auto &&[t_id, l_type, data] = get_log_info(in);
-        // TODO
-        switch (l_type) {
-            case BEGIN:
-                break;
-            case COMMIT:
-                break;
-            case ROLLBACK:
-                break;
-            case UPDATE:
-                break;
-            case INSERT:
-                break;
-            case REMOVE:
-                break;
-            default:
-                break;
-        }
-    }
-}
-
-template <typename F>
-void undo(F get_table_ptr);
 
 } // namespace sdb
 

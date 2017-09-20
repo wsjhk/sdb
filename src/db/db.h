@@ -52,7 +52,7 @@ private:
     // transaction check
     void trans_check(TransInfo t_info);
 
-    // transaction begin/commit
+    // transaction begin/commit/rollback
     Tid get_new_tid();
     TransInfo begin(Tid t_id);
     void commit(Tid t_id);

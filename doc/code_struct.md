@@ -2,31 +2,33 @@
 
 ### DB layer:
 
-DB layer 已经实现表的增删查改和索引功能，已经支持foreign key．
++ src/db/block_alloc: 磁盘块的分配管理。
 
-1. src/db/io
++ src/db/bptree: B+Tree(B-link Tree)的实现，支持针对主键增删查改。
 
-    实现文件的io操作,包括增删读写文件，利用mmap实现的按块读写，配合索引提高随机读写效率．
++ src/db/cache: 块缓冲器，实现了读写时间复杂度都为O(1)的LRU缓冲算法。
 
-2. src/db/record
++ src/db/db: 整个系统的管理。
 
-    实现对记录的增删查改,支持可边长类型数据,但记录的长度不超过Block的长度.
++ src/db/db_type: 数据库类型系统，支持Int/UInt/BigInt/Varchar。
 
-3. src/db/bptree
++ src/db/io: 实现文件的io操作,包括增删读写文件，利用mmap实现的按块读写，配合索引提高随机读写效率。
 
-    B+Tree的实现,支持针对主键增删查改.尚未实现重建索引和动态添加索引.
++ src/db/property: 表结构属性。
 
-4. src/db/table
++ src/db/record: 实现对记录的增删查改,支持可变长类型数据，但记录的长度不能超过Block的长度。
 
-    表结构的实现,支持表的创建和删除,以及对记录的增删查改,支持谓词判断的查询.
++ src/db/snapshot: 快照管理，为事务提供快照隔离机制（块级别）。
 
-5. src/db/cache
++ src/db/table: 表结构的实现，支持表的创建和删除，以及对记录的增删查改，支持谓词判断的查询。
 
-    缓冲器，实现了读写时间复杂度都为O(1)的LFU缓冲算法．
++ src/db/temp: 临时空间创建，用于支持查询物化等需。
 
-6. src/db/db
++ src/db/tlog: 日志机制的实现。
 
-    数据库接口，提供增删查改功能,多表的外键参照完整性检查．
++ src/db/tuple: 数据元组，行数据。
+
++ src/db/util: 常用类型、函数集(如： de_bytes, en_bytes)
 
 ### SQL Layer
 

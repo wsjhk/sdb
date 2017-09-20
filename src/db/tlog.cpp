@@ -8,7 +8,7 @@ namespace sdb {
 // begin content    : <>
 // commit content   : <>
 // rollback content : <>
-// update content   : <table_name, col_name, old_val, new_val>
+// update content   : <table_name, new_tuple>
 // insert content   : <table_name, tuple>
 // remove content   : <table_name, keys>
 //
@@ -43,32 +43,32 @@ void Tlog::rollback(Tid t_id, const std::string &db_name) {
     write(db_name, bytes);
 }
 
-void Tlog::update(Tid t_id, const TableProperty &tp, const std::string &col_name, db_type::ObjCntPtr old_val, db_type::ObjCntPtr new_val) {
+void Tlog::update(Tid t_id, const std::string &table_name, const Tuple &new_tuple) {
     assert(db_mt.find(db_name) != db_mt.end());
 
     // log type
     Bytes bytes = sdb::en_bytes(char(UPDATE));
     // log content
-    sdb::bytes_append(bytes, t_id, tp.table_name, col_name, old_val, new_val);
-    write(tp.db_name, bytes);
+    sdb::bytes_append(bytes, t_id, table_name, new_tuple);
+    write(db_name, bytes);
 }
 
-void Tlog::insert(Tid t_id, const TableProperty &tp, const Tuple &data) {
+void Tlog::insert(Tid t_id, const std::string &table_name, const Tuple &tuple) {
     assert(db_mt.find(db_name) != db_mt.end());
     // log type
     Bytes bytes = sdb::en_bytes(char(INSERT));
     // log content
-    sdb::bytes_append(bytes, t_id, tp.table_name, data);
-    write(tp.db_name, bytes);
+    sdb::bytes_append(bytes, t_id, table_name, tuple);
+    write(db_name, bytes);
 }
 
-void Tlog::remove(Tid t_id, const TableProperty &tp, const Tuple &keys) {
+void Tlog::remove(Tid t_id, const std::string &table_name, const Tuple &keys) {
     assert(db_mt.find(db_name) != db_mt.end());
     // log type
     Bytes bytes = sdb::en_bytes(char(REMOVE));
     // log content
-    sdb::bytes_append(bytes, t_id, tp.table_name,keys);
-    write(tp.db_name, bytes);
+    sdb::bytes_append(bytes, t_id, table_name, keys);
+    write(db_name, bytes);
 }
 
 // ========== private =========

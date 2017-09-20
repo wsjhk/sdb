@@ -54,6 +54,10 @@ struct TableProperty {
     std::vector<std::string> get_col_name_lst()const;
     ColPropertyList get_keys_property()const;
     // TODO
+    ColProperty get_col_property(const std::string &col_name)const;
+    // TODO
+    std::vector<db_type::TypeInfo> get_type_info_lst()const;
+    // TODO
     std::vector<Size> get_keys_pos()const;
 };
 

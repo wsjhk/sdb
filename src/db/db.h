@@ -16,6 +16,7 @@ class DB {
 public:
     // type
     using TablePtr = std::shared_ptr<Table>;
+    using TlogPtr = std::shared_ptr<Tlog>;
 
 public:
     DB(const std::string &db_name);
@@ -25,8 +26,7 @@ public:
     static void drop_db(const std::string &db_name);
     void execute(AstNodePtr ptr);
     // log
-    void log_redo();
-    void log_undo();
+    void recover();
 
 private:
     // check integrity
@@ -47,6 +47,7 @@ private:
     // table
     void create_table(TransInfo ti, const TableProperty &tp);
     void drop_table(TransInfo ti, const std::string &table_name);
+    TablePtr get_table_ptr(Tid t_id, const std::string &db_name);
 
     // transaction check
     void trans_check(TransInfo t_info);
@@ -54,15 +55,19 @@ private:
     // transaction begin/commit
     Tid get_new_tid();
     TransInfo begin(Tid t_id);
-    void commit(TransInfo t_info);
+    void commit(Tid t_id);
+    void rollback(Tid t_id);
 
     // log
+    // redo op
     void log_redo_begin(Tid t_id);
     void log_redo_commit(Tid t_id);
     void log_redo_rollback(Tid t_id);
     void log_redo_update(Tid t_id, const Bytes &bytes);
     void log_redo_insert(Tid t_id, const Bytes &bytes);
     void log_redo_remove(Tid t_id, const Bytes &bytes);
+    // undo
+    void log_undo(const std::set<Tid> &undo_set);
 
 private:
     std::string db_name;
@@ -79,15 +84,15 @@ private:
     // 1  : has shared_lock
     // 2  : has unique_lock
     //
-    // <transaction info, <table name, <lock info, table ptr>>>
-    std::map<TransInfo, std::map<std::string, std::pair<int8_t, TablePtr>>> t_snapshot;
+    std::map<Tid, TransInfo> t_info_map;
+    // <t_id, <table name, <lock info, table ptr>>>
+    std::map<Tid, std::map<std::string, std::pair<int8_t, TablePtr>>> t_snapshot;
 
     // atomic transaction id
     std::atomic_int64_t atomic_t_id;
 
     // log
-    Tlog t_log;
-    //
+    TlogPtr t_log_ptr;
 };
 
 } // namespace sdb

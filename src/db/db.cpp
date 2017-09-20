@@ -8,7 +8,7 @@
 
 namespace sdb {
 
-DB::DB(const std::string &db_name):db_name(db_name), t_log(db_name) {
+DB::DB(const std::string &db_name):db_name(db_name), t_log_ptr(std::make_shared<Tlog>(db_name)) {
     add_table_list();
     add_col_list();
     // add_index();
@@ -185,7 +185,7 @@ std::vector<std::string> DB::table_name_lst(TransInfo t_info) {
 
 void DB::create_table(TransInfo t_info, const TableProperty &tp) {
     // insert table map
-    auto &[lock_stat, ptr] = t_snapshot[t_info][tp.table_name];
+    auto &[lock_stat, ptr] = t_snapshot[t_info.id][tp.table_name];
     if (lock_stat == 0) {
         lock_stat = -2;
         mutex_map[tp.table_name].lock();
@@ -232,7 +232,7 @@ void DB::create_table(TransInfo t_info, const TableProperty &tp) {
 }
 
 void DB::drop_table(TransInfo t_info, const std::string &table_name) {
-    auto &[lock_stat, ptr] = t_snapshot[t_info][table_name];
+    auto &[lock_stat, ptr] = t_snapshot[t_info.id][table_name];
     if (lock_stat == 0) {
         lock_stat = -2;
         mutex_map[table_name].lock();
@@ -268,27 +268,36 @@ Tid DB::get_new_tid() {
     return old_t_id;
 }
 
-TransInfo DB::begin(Tid t_id) {
+TransInfo DB::begin(Tid t_id = -1) {
     Tid info_t_id = t_id;
     if (t_id == -1) {
         info_t_id = get_new_tid();
     }
+    auto s_ptr = std::make_shared<Snapshot>(db_name);
+    TransInfo info{info_t_id, TransInfo::READ, s_ptr, t_log_ptr};
+    t_info_map[info.id];
+    t_snapshot[info.id];
+    return info;
 }
 
 //  ===== log =====
-void DB::log_redo() {
+void DB::recover() {
     std::ifstream in(db_name + "/log.sdb");
+    std::set<Tid> undo_set;
     while (!in.eof()) {
-        auto &&[t_id, l_type, data] = t_log.get_log_info(in);
+        auto &&[t_id, l_type, data] = t_log_ptr->get_log_info(in);
         switch (l_type) {
             case Tlog::BEGIN:
                 log_redo_begin(t_id);
+                undo_set.insert(t_id);
                 break;
             case Tlog::COMMIT:
                 log_redo_commit(t_id);
+                undo_set.erase(t_id);
                 break;
             case Tlog::ROLLBACK:
                 log_redo_rollback(t_id);
+                undo_set.erase(t_id);
                 break;
             case Tlog::UPDATE:
                 log_redo_update(t_id, data);
@@ -304,12 +313,55 @@ void DB::log_redo() {
                 break;
         }
     }
+    log_undo(undo_set);
 }
 
-void DB::log_undo() {
+void DB::log_undo(const std::set<Tid> &undo_set) {
+    for (auto &&t_id : undo_set) {
+        rollback(t_id);
+    }
 }
 
 void DB::log_redo_begin(Tid t_id) {
+    begin(t_id);
+}
+
+void DB::log_redo_commit(Tid t_id) {
+    commit(t_id);
+}
+
+void DB::log_redo_rollback(Tid t_id) {
+    rollback(t_id);
+}
+
+void DB::log_redo_update(Tid t_id, const Bytes &bytes) {
+    Size offset = 0;
+    std::string table_name;
+    TablePtr ptr = get_table_ptr(t_id, table_name);
+    sdb::de_bytes(table_name, bytes, offset);
+    Tuple new_tuple;
+    new_tuple.de_bytes(ptr->tp.get_type_info_lst(), bytes, offset);
+    ptr->update(t_info_map[t_id], new_tuple);
+}
+
+void DB::log_redo_insert(Tid t_id, const Bytes &bytes) {
+    Size offset = 0;
+    std::string table_name;
+    TablePtr ptr = get_table_ptr(t_id, table_name);
+    sdb::de_bytes(table_name, bytes, offset);
+    Tuple new_tuple;
+    new_tuple.de_bytes(ptr->tp.get_type_info_lst(), bytes, offset);
+    ptr->insert(t_info_map[t_id], new_tuple);
+}
+
+void DB::log_redo_remove(Tid t_id, const Bytes &bytes) {
+    Size offset = 0;
+    std::string table_name;
+    TablePtr ptr = get_table_ptr(t_id, table_name);
+    sdb::de_bytes(table_name, bytes, offset);
+    Tuple keys;
+    keys.de_bytes(ptr->tp.get_type_info_lst(), bytes, offset);
+    ptr->remove(t_info_map[t_id], keys);
 }
 
 } // namespace sdb

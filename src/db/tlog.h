@@ -28,14 +28,13 @@ public:
     void begin(Tid t_id, const std::string &db_name);
     void commit(Tid t_id, const std::string &db_name);
     void rollback(Tid t_id, const std::string &db_name);
-    void update(Tid t_id, const TableProperty &tp, const std::string &col_name, db_type::ObjCntPtr old_val, db_type::ObjCntPtr new_val);
-    void insert(Tid t_id, const TableProperty &tp, const Tuple &data);
-    void remove(Tid t_id, const TableProperty &tp, const Tuple &keys);
+    void update(Tid t_id, const std::string &table_name, const Tuple &new_tuple);
+    void insert(Tid t_id, const std::string &table_name, const Tuple &tuple);
+    void remove(Tid t_id, const std::string &table_name, const Tuple &keys);
 
     std::tuple<Tid, LogType, Bytes> get_log_info(std::ifstream &in);
 
 private:
-
     void write(const std::string &db_name, const Bytes &bytes);
 
 private:

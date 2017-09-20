@@ -9,7 +9,7 @@ Bytes Snapshot::read_block(BlockNum block_num, bool is_record) {
         return block_cache.get(block_path(), it->second.second);
     }
     Bytes bytes = block_cache.get(block_path(), block_num);
-    if (t_info.level == TransInfo::READ) {
+    if (level == TransInfo::READ) {
         return bytes;
     }
     BlockNum new_block_num = block_alloc.new_temp_block(block_path());

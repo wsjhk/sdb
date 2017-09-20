@@ -48,7 +48,8 @@ public:
 
     // can't update primary key, 
     // use insert/remove in primary index if need update key
-    void update(TransInfo ti, const Tuple &new_tuple);
+    void update(TransInfo t_info, const Tuple &new_tuple);
+    // void update(TransInfo t_info, const Tuple keys, const std::string &col_name, db_type::ObjCntPtr new_val);
     // update while predicate
     void update(TransInfo ti, TuplePred pred, TupleOp Op);
 

@@ -9,6 +9,8 @@
 namespace sdb {
 
 DB::DB(const std::string &db_name):db_name(db_name), t_log_ptr(std::make_shared<Tlog>(db_name)) {
+    // init db io
+    IO::get(db_name);
     add_table_list();
     add_col_list();
     // add_index();
@@ -47,7 +49,7 @@ void DB::add_table_list() {
     ColProperty table_name_col("table_name", sdb::en_bytes(static_cast<char>(VARCHAR), Size(64)), 0, true);
     ColProperty rr_cp("record_root", sdb::en_bytes(static_cast<char>(INT)), 1);
     ColProperty ki_cp("keys_idx_root", sdb::en_bytes(static_cast<char>(INT)), 2);
-    TableProperty meta_tp(db_name, ".table_list", 0, 1, {table_name_col, rr_cp});
+    TableProperty meta_tp(".table_list", 0, 1, {table_name_col, rr_cp});
 
     table_map[".table_list"] = std::make_shared<Table>(meta_tp);
 }
@@ -84,7 +86,7 @@ void DB::add_col_list() {
     cp_lst.push_back(is_not_null_cp);
 
     // get table property
-    TableProperty col_list_tp(db_name, ".col_list", 2, 3, cp_lst);
+    TableProperty col_list_tp(".col_list", 2, 3, cp_lst);
     table_map[".col_list"] = std::make_shared<Table>(col_list_tp);
 }
 
@@ -164,7 +166,7 @@ TableProperty DB::get_tp(TransInfo ti, const std::string &table_name) {
         ColProperty cp(col_name, type_info, is_key, is_not_null);
         col_lst.push_back(cp);
     }
-    return TableProperty(db_name, table_name, record_root, keys_idx_root, col_lst);
+    return TableProperty(table_name, record_root, keys_idx_root, col_lst);
 }
 
 std::vector<std::string> DB::table_name_lst(TransInfo t_info) {

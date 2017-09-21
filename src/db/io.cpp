@@ -24,15 +24,16 @@ using namespace cpp_util;
 // ========= public =========
 // dir
 namespace sdb {
+
 void IO::create_dir(const std::string &dir_path) {
-    std::string abs_path = get_db_file_path(dir_path);
+    std::string abs_path = get_db_dir_path() + "/" + dir_path;
     bool sc = ef::create_directory(abs_path);
     assert_msg(sc, format("Error: file %s already existed", abs_path));
 }
 
 void IO::remove_dir_force(const std::string &dir_path) {
     try {
-        ef::remove_all(get_db_file_dir_path()+"/"+dir_path);
+        ef::remove_all(get_db_dir_path() + "/" + dir_path);
     } catch (ef::filesystem_error err) {
         assert_msg(false, err.what());
     }
@@ -128,15 +129,15 @@ size_t IO::get_file_size(const std::string &file_path) {
     return (size_t)(file_info.st_size);
 }
 
-std::string IO::get_db_file_dir_path() {
+std::string IO::get_db_dir_path() {
     auto dir_path = ef::path(__FILE__).parent_path();
     std::string file_path = dir_path.generic_string()+"/data";
     return file_path;
 }
 
-std::string IO::get_db_file_path(const std::string &file_name) {
-    std::string file_path = get_db_file_dir_path();
-    return file_path + '/' + file_name;
+std::string IO::get_db_file_path(const std::string &path)const {
+    std::string file_path = get_db_dir_path() + "/" + db_name + "/" + path;
+    return file_path;
 }
 
 } // namespace  sdb

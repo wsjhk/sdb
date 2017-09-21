@@ -14,9 +14,9 @@ public:
         return block_alloc;
     }
 
-    BlockNum new_block(const std::string &db_name);
-    BlockNum new_temp_block(const std::string &db_name);
-    void free_block(const std::string &db_name, BlockNum block_num);
+    BlockNum new_block();
+    BlockNum new_temp_block();
+    void free_block(BlockNum block_num);
 
 private:
     BlockAlloc(){}
@@ -26,12 +26,7 @@ private:
     BlockAlloc &operator=(BlockAlloc &&)=delete;
 
 private:
-    std::unordered_map<std::string, std::mutex> mutex_map;
-
-public: //for test
-    std::unordered_map<std::string, std::mutex> &_get_map() {
-        return mutex_map;
-    }
+    std::mutex mutex;
 };
 
 } // namespace sdb

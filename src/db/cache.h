@@ -11,6 +11,7 @@
 #include <mutex>
 
 #include "util.h"
+#include "io.h"
 
 namespace sdb {
 
@@ -24,22 +25,14 @@ namespace sdb {
 // };
 // 
 
-// LRU
 class BlockCache {
 public:
-    // alias
-    using BlockPtr = std::shared_ptr<Bytes>;
-
-    using CacheKey = std::string;
-    using KeyPair = std::pair<std::string, BlockNum>;
-
     struct CacheValue {
-        CacheKey key;
-        BlockPtr ptr;
+        BlockNum key;
+        Bytes data;
         CacheValue()=delete;
-        CacheValue(const std::string &key, BlockPtr ptr):key(key), ptr(ptr){}
+        CacheValue(BlockNum key, Bytes data):key(key), data(data){}
     };
-
     using ValueList = std::list<CacheValue>;
 
     explicit BlockCache(size_t max_block_count):max_block_count(max_block_count){}
@@ -49,15 +42,14 @@ public:
     BlockCache &operator=(BlockCache &&)=delete;
 
     // get and put
-    Bytes get(const std::string &path, BlockNum block_num);
-    void put(const std::string &path, size_t block_num, const Bytes &data);
+    Bytes get(BlockNum block_num);
+    void put(BlockNum block_num, const Bytes &data);
 
     // sync all cache
     void sync();
     // sync file
-    // auto sync(const std::string &path);
     // sync block
-    void sync(const std::string &path, Size block_num);
+    void sync(BlockNum block_num);
 
     // for test
     ValueList _value_list()const {
@@ -65,9 +57,6 @@ public:
     }
 
 private:
-    CacheKey encode_key(const std::string &path, size_t block_num);
-    KeyPair decode_key(const std::string &key);
-
     // block io
     Bytes read_block(const std::string &path, size_t block_num);
 
@@ -81,7 +70,9 @@ private:
     std::mutex mutex;
     // block cache data list
     ValueList value_list;
-    std::unordered_map<CacheKey, ValueList::iterator> key_map;
+    std::unordered_map<BlockNum, ValueList::iterator> key_map;
+    // io
+    IO &io = IO::get();
 };
 
 class CacheMaster {

@@ -1,4 +1,5 @@
 #include "tlog.h"
+#include "io.h"
 #include <fstream>
 
 namespace sdb {
@@ -13,53 +14,46 @@ namespace sdb {
 // remove content   : <table_name, keys>
 //
 
-void Tlog::begin(Tid t_id, const std::string &db_name) {
+void Tlog::begin(Tid t_id) {
     assert(db_mt.find(db_name) != db_mt.end());
 
     // log type
     Bytes bytes = sdb::en_bytes(char(BEGIN));
     // log content
     sdb::bytes_append(bytes, t_id);
-    write(db_name, bytes);
+    write(bytes);
 }
 
-void Tlog::commit(Tid t_id, const std::string &db_name) {
-    assert(db_mt.find(db_name) != db_mt.end());
-
+void Tlog::commit(Tid t_id) {
     // log type
     Bytes bytes = sdb::en_bytes(char(COMMIT));
     // log content
     sdb::bytes_append(bytes, t_id);
-    write(db_name, bytes);
+    write(bytes);
 }
 
-void Tlog::rollback(Tid t_id, const std::string &db_name) {
-    assert(db_mt.find(db_name) != db_mt.end());
-
+void Tlog::rollback(Tid t_id) {
     // log type
     Bytes bytes = sdb::en_bytes(char(ROLLBACK));
     // log content
     sdb::bytes_append(bytes, t_id);
-    write(db_name, bytes);
+    write(bytes);
 }
 
 void Tlog::update(Tid t_id, const std::string &table_name, const Tuple &new_tuple) {
-    assert(db_mt.find(db_name) != db_mt.end());
-
     // log type
     Bytes bytes = sdb::en_bytes(char(UPDATE));
     // log content
     sdb::bytes_append(bytes, t_id, table_name, new_tuple);
-    write(db_name, bytes);
+    write(bytes);
 }
 
 void Tlog::insert(Tid t_id, const std::string &table_name, const Tuple &tuple) {
-    assert(db_mt.find(db_name) != db_mt.end());
     // log type
     Bytes bytes = sdb::en_bytes(char(INSERT));
     // log content
     sdb::bytes_append(bytes, t_id, table_name, tuple);
-    write(db_name, bytes);
+    write(bytes);
 }
 
 void Tlog::remove(Tid t_id, const std::string &table_name, const Tuple &keys) {
@@ -68,11 +62,11 @@ void Tlog::remove(Tid t_id, const std::string &table_name, const Tuple &keys) {
     Bytes bytes = sdb::en_bytes(char(REMOVE));
     // log content
     sdb::bytes_append(bytes, t_id, table_name, keys);
-    write(db_name, bytes);
+    write(bytes);
 }
 
 // ========== private =========
-void Tlog::write(const std::string &db_name, const Bytes &bytes) {
+void Tlog::write(const Bytes &bytes) {
     // lock
     std::lock_guard<std::mutex> lg(mutex);
     Size log_size = sizeof(Tid) + bytes.size();
@@ -82,7 +76,7 @@ void Tlog::write(const std::string &db_name, const Bytes &bytes) {
 
     // write
     using std::ios;
-    std::ofstream out(db_name + "/log.sdb", ios::binary | ios::app);
+    std::ofstream out(IO::block_path(), ios::binary | ios::app);
     out.write(log_len_btyes.data(), log_len_btyes.size());
     out.close();
 

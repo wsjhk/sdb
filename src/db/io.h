@@ -1,7 +1,3 @@
-//
-// Created by sven on 17-2-19.
-//
-
 #ifndef DB_IO_H
 #define DB_IO_H
 
@@ -12,14 +8,14 @@ namespace sdb {
 
 class IO {
 public:
-    static IO &get() {
-        static IO io;
+    static IO &get(const std::string &db_name = "") {
+        static IO io(db_name);
         return io;
     }
 
     // dir
-    void create_dir(const std::string &dir_path);
-    void remove_dir_force(const std::string &dir_path);
+    static void create_dir(const std::string &dir_path);
+    static void remove_dir_force(const std::string &dir_path);
 
     // file
     void create_file(const std::string &file_path);
@@ -36,19 +32,28 @@ public:
 
     // get
     bool has_file(const std::string &str);
-    static std::string get_block_path(const std::string &db_name) {
-        return db_name + "/block.sdb";
+
+    // path
+    static std::string block_path() {
+        return "block.sdb";
+    }
+    std::string log_path() const {
+        return "log.sdb";
+    }
+    std::string alloc_path() const {
+        return "alloc.sdb";
     }
 
 private:
     // private function
-    std::string get_db_file_dir_path();
-    std::string get_db_file_path(const std::string &file_path);
+    std::string db_name;
+    static std::string get_db_dir_path();
+    std::string get_db_file_path(const std::string &path)const;
     size_t get_file_size(const std::string &file_path);
 
 private:
     // private member
-    IO(){}
+    IO(const std::string &db_name):db_name(db_name){}
     IO(const IO &io)=delete;
     IO(IO &&io)=delete;
     IO &operator=(const IO &io)=delete;

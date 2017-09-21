@@ -30,7 +30,6 @@ struct TableProperty {
     using ColPropertyList = std::vector<ColProperty>;
 
     // Type
-    std::string db_name;
     std::string table_name;
     BlockNum record_root;
     BlockNum keys_idx_root;
@@ -42,12 +41,11 @@ struct TableProperty {
     std::unordered_map<std::string, std::string> referenced_map;
 
     // TableProperty(){}
-    TableProperty(const std::string &db_name,
-                  const std::string &table_name,
+    TableProperty(const std::string &table_name,
                   BlockNum record_root,
                   BlockNum keys_idx_root,
                   const ColPropertyList &col_property_lst)
-            :db_name(db_name), table_name(table_name), record_root(record_root), keys_idx_root(keys_idx_root) , col_property_lst(col_property_lst){}
+            :table_name(table_name), record_root(record_root), keys_idx_root(keys_idx_root) , col_property_lst(col_property_lst){}
 
     // getter
     Size get_col_property_pos(const std::string &col_name)const;

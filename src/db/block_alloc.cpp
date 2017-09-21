@@ -4,15 +4,11 @@
 
 namespace sdb {
 
-BlockNum BlockAlloc::new_block(const std::string &db_name) {
-    auto mutex_it = mutex_map.find(db_name);
-    assert_msg(mutex_it != mutex_map.end(), cpp_util::format("has not db : [%s]", db_name));
-    mutex_it->second.lock();
-
+BlockNum BlockAlloc::new_block() {
+    std::lock_guard<std::mutex> gt(mutex);
     // read free list
-    std::string file_path = db_name+"/alloc.sdb";
     IO &io = IO::get();
-    Bytes bytes = io.read_file(file_path);
+    Bytes bytes = io.read_file(io.alloc_path());
     int offset = 0;
     std::vector<int> free_lst;
     de_bytes(free_lst, bytes, offset);
@@ -29,29 +25,22 @@ BlockNum BlockAlloc::new_block(const std::string &db_name) {
     }
 
     // write back
-    io.full_write_file(file_path, en_bytes(free_lst));
-
-    mutex_it->second.unlock();
+    io.full_write_file(io.alloc_path(), en_bytes(free_lst));
     return ret;
 }
 
-void BlockAlloc::free_block(const std::string &db_name, BlockNum block_num) {
-     auto mutex_it = mutex_map.find(db_name);
-    assert_msg(mutex_it != mutex_map.end(), cpp_util::format("not has db : [%s]", db_name));
-    mutex_it->second.lock();
+void BlockAlloc::free_block(BlockNum block_num) {
+    std::lock_guard<std::mutex> gt(mutex);
 
-    std::string file_path = db_name+"/alloc.sdb";
     IO &io = IO::get();
-    Bytes bytes = io.read_file(file_path);
+    Bytes bytes = io.read_file(io.alloc_path());
     int offset = 0;
     std::vector<Size> free_lst;
     de_bytes(free_lst, bytes, offset);
 
     free_lst.push_back(block_num);
 
-    io.full_write_file(file_path, en_bytes(free_lst));
-
-    mutex_it->second.unlock();
+    io.full_write_file(io.alloc_path(), en_bytes(free_lst));
 }
 
 } // namespace sdb

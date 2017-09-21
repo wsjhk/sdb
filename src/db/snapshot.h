@@ -7,6 +7,7 @@
 #include "cache.h"
 #include "io.h"
 #include "block_alloc.h"
+#include "tuple.h"
 
 namespace sdb {
 
@@ -24,15 +25,22 @@ public:
         this->level = level;
     }
 
-public:
-    // <old_block_num, new_block_num>>
-    std::map<BlockNum, BlockNum> block_map;
-
 private:
-    TransInfo::Level level = TransInfo::READ;
     BlockCache &block_cache = CacheMaster::get_block_cache();
     BlockAlloc &block_alloc = BlockAlloc::get();
     IO &io = IO::get();
+
+private:
+    TransInfo::Level level = TransInfo::READ;
+    // <old_block_num, new_block_num>>
+    
+    // modified tuple key set
+    using KeySet = std::set<Tuple>;
+    std::map<BlockNum, std::pair<BlockNum, KeySet>> block_map;
+
+    // block lock()
+    // TODO concurrent map
+    static std::map<BlockNum, std::mutex> block_lock_map;
 };
 
 } // namespace sdb

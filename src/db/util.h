@@ -9,13 +9,14 @@
 #include <string>
 #include <iostream>
 #include <map>
+#include <atomic>
 #include <set>
 #include <list>
 #include <unordered_map>
 #include <unordered_set>
 #include <boost/spirit/home/support/container.hpp>
 
-#include "../cpp_util/error.hpp"
+#include "../cpp_util/lib/error.hpp"
 
 namespace sdb {
 
@@ -54,53 +55,40 @@ struct TransInfo {
 namespace Traits {
     // pair
     template <typename T>
-    struct PairTraits {
-        static const bool value = false;
-    };
+    struct PairTraits : std::false_type{};
+
     template <typename Fst, typename Sec>
-    struct PairTraits<std::pair<Fst, Sec>> {
-        static const bool value = true;
-    };
+    struct PairTraits<std::pair<Fst, Sec>> :std::true_type{};
 
     // unordered_map
     template <typename T>
-    struct UMapTraits {
-        static const bool value = false;
-    };
+    struct UMapTraits : std::false_type {};
     template <typename Fst, typename Snd>
-    struct UMapTraits<std::unordered_map<Fst, Snd>> {
-        static const bool value = true;
-    };
+    struct UMapTraits<std::unordered_map<Fst, Snd>> : std::true_type {};
 
     // map
     template <typename T>
-    struct MapTraits {
-        static const bool value = false;
-    };
+    struct MapTraits : std::false_type {};
     template <typename Fst, typename Snd>
-    struct MapTraits<std::map<Fst, Snd>> {
-        static const bool value = true;
-    };
+    struct MapTraits<std::map<Fst, Snd>> : std::true_type{};
 
     // unordered_set
     template <typename T>
-    struct USetTraits {
-        static const bool value = false;
-    };
+    struct USetTraits : std::false_type{};
     template <typename T>
-    struct USetTraits<std::unordered_set<T>> {
-        static const bool value = true;
-    };
+    struct USetTraits<std::unordered_set<T>>:std::true_type{};
 
     // set
     template <typename T>
-    struct SetTraits {
-        static const bool value = false;
-    };
+    struct SetTraits : std::false_type {};
     template <typename T>
-    struct SetTraits<std::set<T>> {
-        static const bool value = true;
-    };
+    struct SetTraits<std::set<T>> : std::true_type {};
+
+    // atomic
+    template <typename T>
+    struct AtomicTrait : std::false_type {};
+    template <typename T>
+    struct AtomicTrait<std::atomic<T>> : std::true_type {};
 
     // always_false
     template <typename T>
@@ -111,6 +99,7 @@ namespace Traits {
 
     template<typename T>
     constexpr bool is_map_v = MapTraits<T>::value || UMapTraits<T>::value;
+
 } // SDB::Taits namespace
 
 using boost::spirit::traits::is_container;
@@ -217,6 +206,14 @@ template <typename ...Args>
 inline void bytes_append(Bytes &bytes, Args... args) {
     Bytes append_bytes = en_bytes(args...);
     bytes.insert(bytes.end(), append_bytes.begin(), append_bytes.end());
+}
+
+template <typename T>
+inline T atomic_increment_integer(T &data) {
+    static_assert(Traits::AtomicTrait<T>::value);
+    T old_data = data;
+    while (!data.compare_exchange_weak(&old_data, old_data + 1));
+    return old_data;
 }
 
 } // SDB namespace

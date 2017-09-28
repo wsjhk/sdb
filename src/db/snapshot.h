@@ -18,7 +18,7 @@ public:
     Bytes read_block(BlockNum block_num);
     void write_block(BlockNum block_num, const Bytes &bytes);
     void rollback();
-    void commit();
+    bool commit();
 
     // setter
     void set_isolation_level(TransInfo::Level level) {
@@ -34,9 +34,7 @@ private:
     TransInfo::Level level = TransInfo::READ;
     // <old_block_num, new_block_num>>
     
-    // modified tuple key set
-    using KeySet = std::set<Tuple>;
-    std::map<BlockNum, std::pair<BlockNum, KeySet>> block_map;
+    std::map<BlockNum, BlockNum> block_map;
 
     // block lock()
     // TODO concurrent map

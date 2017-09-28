@@ -58,9 +58,6 @@ public:
 
 private: // function
     Size get_bytes_size()const;
-    std::string block_path()const {
-        return tp.db_name + "/block.sdb";
-    }
 
 private: // member
     TransInfo t_info;

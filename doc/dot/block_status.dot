@@ -1,0 +1,10 @@
+digraph BlockStatus {
+    rankdir = LR;
+    node [shape = rectangle];
+    new  -> temp [label="new_block"];
+    temp -> used [label="sync_block"];
+    temp -> free [label="free_block"];
+    used -> free [label="free_block"];
+    free -> used [label="new_block"];
+    free -> temp [label="new_block"];
+}

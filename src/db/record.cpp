@@ -8,7 +8,7 @@
 namespace sdb {
 
 Record::Record(TransInfo t_info, TableProperty table_property, BlockNum bn):t_info(t_info), tp(table_property), block_num(bn) {
-    Bytes bytes = t_info.s_ptr->read_block(bn, true);
+    Bytes bytes = t_info.s_ptr->read_block(bn);
     // read next record num
     Size offset = 0;
     sdb::de_bytes(next_record_num, bytes, offset);
@@ -38,7 +38,7 @@ bool Record::is_full() const {
 
 Record Record::split() {
     // need log
-    BlockNum new_bn = BlockAlloc::get().new_block(tp.db_name );
+    BlockNum new_bn = BlockAlloc::get().new_block();
     Record record(t_info, tp, new_bn);
     // set next record num
     record.next_record_num = next_record_num;
@@ -58,7 +58,6 @@ void Record::merge(Record &&record) {
 }
 
 void Record::sync() const {
-    std::string path = tp.db_name + "/block.sdb";
     // next record num
     Bytes bytes = sdb::en_bytes(next_record_num);
     // record list
@@ -66,7 +65,7 @@ void Record::sync() const {
     bytes.insert(bytes.end(), tuples_bytes.begin(), tuples_bytes.end());
     assert(bytes.size() <= BLOCK_SIZE);
     bytes.resize(BLOCK_SIZE);
-    t_info.s_ptr->write_block(block_num, bytes, true);
+    t_info.s_ptr->write_block(block_num, bytes);
 }
 
 Size Record::get_bytes_size()const {

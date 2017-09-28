@@ -34,21 +34,16 @@ public:
     bool has_file(const std::string &str);
 
     // path
-    static std::string block_path() {
-        return "block.sdb";
-    }
-    std::string log_path() const {
-        return "log.sdb";
-    }
-    std::string alloc_path() const {
-        return "alloc.sdb";
-    }
+    static std::string get_db_dir_path();
+    std::string get_db_file_path(const std::string &path)const;
+    static std::string block_path() {return "block.sdb";}
+    std::string log_path() const {return "log.sdb";}
+    std::string balloc_log_path()const{return "bloack_log.sdb";}
+    std::string balloc_backup_path()const{return "bloack_backup.sdb";}
 
 private:
     // private function
     std::string db_name;
-    static std::string get_db_dir_path();
-    std::string get_db_file_path(const std::string &path)const;
     size_t get_file_size(const std::string &file_path);
 
 private:

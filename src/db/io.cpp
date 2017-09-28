@@ -13,8 +13,8 @@
 
 #include "io.h"
 #include "util.h"
-#include "../cpp_util/error.hpp"
-#include "../cpp_util/log.hpp"
+#include "../cpp_util/lib/error.hpp"
+#include "../cpp_util/lib/log.hpp"
 
 using std::ios;
 namespace ef = std::experimental::filesystem;
@@ -42,16 +42,12 @@ void IO::remove_dir_force(const std::string &dir_path) {
 // file
 void IO::create_file(const std::string &file_path) {
     std::string abs_path = get_db_file_path(file_path);
-    // todo: multi-thread
-    // unsafe
     assert_msg(!has_file(file_path), abs_path);
     std::ofstream out(abs_path, ios::binary | ios::app);
     out.close();
 }
 
 void IO::delete_file(const std::string &file_name) {
-    // todo: multi-thread
-    // unsafe 
     assert_msg(has_file(file_name), file_name);
     try {
         ef::remove(get_db_file_path(file_name));
@@ -140,4 +136,4 @@ std::string IO::get_db_file_path(const std::string &path)const {
     return file_path;
 }
 
-} // namespace  sdb
+} // namespace sdb

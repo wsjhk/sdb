@@ -5,13 +5,15 @@
 #include "db_type.h"
 #include "property.h"
 #include "tuple.h"
+#include "io.h"
+#include "base_log.h"
 
 #include <mutex>
 #include <fstream>
 
 namespace sdb {
 
-class Tlog {
+class Tlog : public BaseLog {
 public:
     using Lid = int64_t;
     enum LogType : char { 
@@ -39,12 +41,11 @@ public:
     std::tuple<Tid, LogType, Bytes> get_log_info(std::ifstream &in);
 
 private:
-    Tlog(){}
-    void write(const Bytes &bytes);
+    Tlog():BaseLog(IO::get().log_path()){}
+    void write_info(const Bytes &bytes);
 
 private:
-    std::mutex mutex;
-    Tid l_id;
+    std::atomic<Tid> l_id;
 };
 
 } // namespace sdb

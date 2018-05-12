@@ -76,7 +76,7 @@ public:
 
     // append
     void append(const Tuples &tuples) {
-        assert(tuple.len() == col_num);
+        assert(tuples.len() == col_num);
         data.insert(data.end(), tuples.data.begin(), tuples.data.end());
     }
 

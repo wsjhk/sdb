@@ -37,12 +37,15 @@ void BlockAlloc::free_block(BlockNum block_num) {
 
 void BlockAlloc::free_temp_block(BlockNum block_num) {
     assert(temp_set.remove(block_num));
+    assert(free_set.insert(block_num));
     log.log(sdb::en_bytes(TEMP_SET_REMOVE, block_num));
+    log.log(sdb::en_bytes(FREE_SET_INSERT, block_num));
 }
 
 void BlockAlloc::sync_block(BlockNum block_num) {
-    assert(temp_set.remove(block_num));
-    log.log(sdb::en_bytes(FREE_SET_REMOVE, block_num));
+    if (temp_set.remove(block_num)) {
+        log.log(sdb::en_bytes(TEMP_SET_REMOVE, block_num));
+    }
 }
 
 // ========== private ==========

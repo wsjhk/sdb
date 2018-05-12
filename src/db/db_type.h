@@ -5,8 +5,8 @@
 #include <memory>
 
 #include "util.h"
-#include "../cpp_util/error.hpp"
-#include "../cpp_util/str.hpp"
+#include "../cpp_util/lib/error.hpp"
+#include "../cpp_util/lib/str.hpp"
 
 
 namespace sdb::db_type {

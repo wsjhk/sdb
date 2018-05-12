@@ -16,15 +16,14 @@ TEST(db_block_alloc_test, block_alloc) {
     io.full_write_file("_block_alloc_test/alloc.sdb", en_bytes(v));
     BlockAlloc &block_alloc = BlockAlloc::get();
     // todo : delete it
-    block_alloc._get_map()["_block_alloc_test"];
-    int bn = block_alloc.new_block("_block_alloc_test");
+    int bn = block_alloc.new_block();
     ASSERT_TRUE(bn == 0);
-    bn = block_alloc.new_block("_block_alloc_test");
+    bn = block_alloc.new_block();
     ASSERT_TRUE(bn == 1);
-    bn = block_alloc.new_block("_block_alloc_test");
+    bn = block_alloc.new_block();
     ASSERT_TRUE(bn == 2);
-    block_alloc.free_block("_block_alloc_test", 1);
-    bn = block_alloc.new_block("_block_alloc_test");
+    block_alloc.free_block(1);
+    bn = block_alloc.new_block();
     ASSERT_TRUE(bn == 1);
 }
 

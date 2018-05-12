@@ -13,6 +13,7 @@ Tuple &Tuple::operator=(const Tuple &tuple) {
     for (auto &ptr : tuple.data) {
         data.push_back(ptr->clone());
     }
+    return *this;
 }
 
 Tuple &Tuple::operator=(Tuple &&tuple) {
@@ -21,6 +22,7 @@ Tuple &Tuple::operator=(Tuple &&tuple) {
     for (ObjPtr &ptr : tuple.data) {
         ptr = nullptr;
     }
+    return *this;
 }
 
 Size Tuple::type_size()const {

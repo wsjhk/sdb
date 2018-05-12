@@ -18,43 +18,23 @@ TEST(db_cache_test, BlockCache) {
     Bytes b2(BLOCK_SIZE, 'c');
     Bytes b3(BLOCK_SIZE, 'd');
     if (true) {
-        BlockCache cache(3);
-        cache.put(file_path, 0, b0);
-        cache.put(file_path, 1, b1);
-        cache.put(file_path, 2, b2);
-        cache.put(file_path, 0, b0);
-        cache.put(file_path, 3, b3);
-        BlockCache::ValueList lst = cache._value_list();
-        // put
-        auto it = lst.begin();
-        ASSERT_TRUE(*it->ptr == b3);
-        it = std::next(it);
-        ASSERT_TRUE(*it->ptr == b0);
-        it = std::next(it);
-        ASSERT_TRUE(*it->ptr == b2);
-        // get and sync
-        Bytes read_block = cache.get(file_path, 1);
-        ASSERT_TRUE(read_block == b1);
+        BlockCache<3> cache;
+        cache.put(0, b0);
+        cache.put(1, b1);
+        cache.put(2, b2);
+        cache.put(0, b0);
+        cache.put(3, b3);
 
         // sync all cache
         cache.sync();
     }
     // check get sync
-    BlockCache cache(3);
-    cache.get(file_path, 0);
-    cache.get(file_path, 1);
-    cache.get(file_path, 2);
-    cache.get(file_path, 0);
-    cache.get(file_path, 3);
-    BlockCache::ValueList lst = cache._value_list();
-    // put
-    auto it = lst.begin();
-    ASSERT_TRUE(*it->ptr == b3);
-    it = std::next(it);
-    ASSERT_TRUE(*it->ptr == b0);
-    it = std::next(it);
-    ASSERT_TRUE(*it->ptr == b2);
-
+    BlockCache<3> cache;
+    cache.get(0);
+    cache.get(1);
+    cache.get(2);
+    cache.get(0);
+    cache.get(3);
     io.delete_file(file_path);
 
     // === todo

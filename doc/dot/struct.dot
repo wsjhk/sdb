@@ -1,0 +1,67 @@
+digraph db_strut {
+    subgraph cluster_utility {
+        node [style=filled];
+        label = "utility";
+        color=blue;
+        base_log -> util;
+        db_type -> util;
+        tuple -> db_type;
+        property -> db_type;
+    }
+
+    subgraph cluster_store {
+        node [style=filled];
+        label = "io";
+        color=blue;
+        Cache -> BlockAlloc;
+        BlockAlloc -> base_log;
+        BlockAlloc -> IO;
+    }
+
+    IO -> util;
+
+    subgraph cluster_transaction {
+        node [style=filled];
+        label = "transaction";
+        color=blue;
+        snapshot;
+        t_log;
+    }
+
+    t_log -> base_log;
+    snapshot -> Cache;
+
+    subgraph cluster_table {
+        node [style=filled];
+        label = "table";
+        color=blue;
+        table -> index;
+        table -> record;
+        index -> record;
+    }
+
+    record -> t_log;
+    record -> snapshot;
+    record -> tuple;
+    record -> property;
+
+    subgraph cluster_query {
+        node [style=filled];
+        label = "query";
+        color=blue;
+        executor -> optimizer;
+        optimizer -> ast;
+        ast -> parser;
+        parser -> lexer;
+    }
+    
+    optimizer -> table;
+
+    subgraph cluster_db {
+        node [style=filled];
+        label = "db";
+        color=blue;
+        db -> executor;
+        db -> table;
+    }
+}
